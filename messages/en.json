@@ -144,7 +144,12 @@
   "email": "Email",
   "bio": "Bio",
   "accountType": "Account Type",
-  "editProfile": "Edit Profile (Coming Soon)",
+  "editProfile": "Edit Profile",
+  "saveChanges": "Save Changes",
+  "saving": "Saving...",
+  "cancel": "Cancel",
+  "loading": "Loading profile...",
+  "error": "Failed to update profile",
   "yourCertificates": "Your Certificates",
   "downloadShare": "Download and share your earned certificates",
   "completeCourses": "Complete courses to earn certificates"

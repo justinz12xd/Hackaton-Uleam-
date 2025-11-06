@@ -144,7 +144,12 @@
   "email": "Correo electrónico",
   "bio": "Biografía",
   "accountType": "Tipo de cuenta",
-  "editProfile": "Editar Perfil (Próximamente)",
+  "editProfile": "Editar Perfil",
+  "saveChanges": "Guardar Cambios",
+  "saving": "Guardando...",
+  "cancel": "Cancelar",
+  "loading": "Cargando perfil...",
+  "error": "Error al actualizar el perfil",
   "yourCertificates": "Tus Certificados",
   "downloadShare": "Descarga y comparte tus certificados obtenidos",
   "completeCourses": "Completa cursos para obtener certificados"
