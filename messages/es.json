@@ -1,0 +1,70 @@
+{
+  "nav": {
+    "courses": "Cursos",
+    "instructor": "Instructor",
+    "dashboard": "Panel",
+    "logout": "Cerrar sesión",
+    "browseCourses": "Explorar Cursos",
+    "login": "Iniciar sesión",
+    "signup": "Registrarse"
+  },
+  "home": {
+    "hero": {
+      "title": "Obtén",
+      "titleHighlight": "Microcredenciales Reconocidas",
+      "subtitle": "Construye tu portafolio profesional con certificados digitales verificados. Aprende habilidades que importan, obtén reconocimiento por tus logros.",
+      "getStarted": "Comenzar",
+      "browseCourses": "Explorar Cursos"
+    },
+    "features": {
+      "title": "¿Por qué elegir EduCred?",
+      "verified": {
+        "title": "Certificados Verificados",
+        "description": "Certificados digitales con códigos QR únicos que puedes compartir con empleadores y colegas."
+      },
+      "quality": {
+        "title": "Contenido de Calidad",
+        "description": "Cursos seleccionados de expertos de la industria que cubren habilidades y conocimientos demandados."
+      },
+      "fast": {
+        "title": "Aprendizaje Rápido",
+        "description": "Aprendizaje flexible y a tu propio ritmo diseñado para adaptarse a tu horario."
+      },
+      "community": {
+        "title": "Comunidad",
+        "description": "Conéctate con estudiantes e instructores en un ambiente colaborativo y de apoyo."
+      }
+    },
+    "courses": {
+      "title": "Cursos Populares",
+      "subtitle": "Comienza a aprender hoy con nuestros programas de microcredenciales más populares",
+      "levels": {
+        "beginner": "Principiante",
+        "intermediate": "Intermedio",
+        "advanced": "Avanzado"
+      },
+      "hours": "horas",
+      "courseTitle": "Título del Curso",
+      "courseDescription": "Aprende habilidades esenciales en este curso completo",
+      "exploreCourse": "Explorar Curso",
+      "explore": "Explorar Curso",
+      "viewAll": "Ver Todos los Cursos"
+    },
+    "cta": {
+      "title": "¿Listo para avanzar en tu carrera?",
+      "subtitle": "Únete a miles de profesionales que obtienen microcredenciales reconocidas.",
+      "button": "Comenzar Gratis"
+    },
+    "footer": {
+      "description": "Empoderando profesionales a través de microcredenciales reconocidas.",
+      "platform": "Plataforma",
+      "company": "Empresa",
+      "legal": "Legal",
+      "about": "Acerca de",
+      "blog": "Blog",
+      "privacy": "Privacidad",
+      "terms": "Términos",
+      "copyright": "Todos los derechos reservados."
+    }
+  }
+}

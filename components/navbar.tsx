@@ -5,6 +5,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { LanguageSwitcher } from "@/components/language-switcher"
+import { useTranslations } from "next-intl"
 
 interface UserProfile {
   role: string
@@ -16,6 +18,7 @@ export function Navbar() {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
+  const t = useTranslations('nav')
 
   useEffect(() => {
     // Check current user
@@ -57,32 +60,34 @@ export function Navbar() {
           {user ? (
             <>
               <Link href="/courses">
-                <Button variant="ghost">Courses</Button>
+                <Button variant="ghost">{t('courses')}</Button>
               </Link>
               {profile?.role === "instructor" || profile?.role === "admin" ? (
                 <Link href="/instructor">
-                  <Button variant="ghost">Instructor</Button>
+                  <Button variant="ghost">{t('instructor')}</Button>
                 </Link>
               ) : (
                 <Link href="/dashboard">
-                  <Button variant="ghost">Dashboard</Button>
+                  <Button variant="ghost">{t('dashboard')}</Button>
                 </Link>
               )}
               <Button variant="outline" onClick={handleLogout}>
-                Logout
+                {t('logout')}
               </Button>
+              <LanguageSwitcher />
             </>
           ) : (
             <>
               <Link href="/courses">
-                <Button variant="ghost">Browse Courses</Button>
+                <Button variant="ghost">{t('browseCourses')}</Button>
               </Link>
               <Link href="/auth/login">
-                <Button variant="ghost">Log in</Button>
+                <Button variant="ghost">{t('login')}</Button>
               </Link>
               <Link href="/auth/signup">
-                <Button>Sign up</Button>
+                <Button>{t('signup')}</Button>
               </Link>
+              <LanguageSwitcher />
             </>
           )}
         </div>

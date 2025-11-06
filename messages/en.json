@@ -1,0 +1,70 @@
+{
+  "nav": {
+    "courses": "Courses",
+    "instructor": "Instructor",
+    "dashboard": "Dashboard",
+    "logout": "Logout",
+    "browseCourses": "Browse Courses",
+    "login": "Log in",
+    "signup": "Sign up"
+  },
+  "home": {
+    "hero": {
+      "title": "Earn Recognized",
+      "titleHighlight": "Microcredentials",
+      "subtitle": "Build your professional portfolio with verified digital certificates. Learn skills that matter, get recognized for your achievements.",
+      "getStarted": "Get Started",
+      "browseCourses": "Browse Courses"
+    },
+    "features": {
+      "title": "Why Choose EduCred?",
+      "verified": {
+        "title": "Verified Certificates",
+        "description": "Digital certificates with unique QR codes you can share with employers and peers."
+      },
+      "quality": {
+        "title": "Quality Content",
+        "description": "Curated courses from industry experts covering in-demand skills and knowledge."
+      },
+      "fast": {
+        "title": "Fast Learning",
+        "description": "Flexible, self-paced learning designed to fit your schedule and pace."
+      },
+      "community": {
+        "title": "Community",
+        "description": "Connect with learners and instructors in a supportive, collaborative environment."
+      }
+    },
+    "courses": {
+      "title": "Popular Courses",
+      "subtitle": "Start learning today from our most popular microcredential programs",
+      "levels": {
+        "beginner": "Beginner",
+        "intermediate": "Intermediate",
+        "advanced": "Advanced"
+      },
+      "hours": "hours",
+      "courseTitle": "Course Title",
+      "courseDescription": "Learn essential skills in this comprehensive course",
+      "exploreCourse": "Explore Course",
+      "explore": "Explore Course",
+      "viewAll": "View All Courses"
+    },
+    "cta": {
+      "title": "Ready to advance your career?",
+      "subtitle": "Join thousands of professionals earning recognized microcredentials.",
+      "button": "Get Started Free"
+    },
+    "footer": {
+      "description": "Empowering professionals through recognized microcredentials.",
+      "platform": "Platform",
+      "company": "Company",
+      "legal": "Legal",
+      "about": "About",
+      "blog": "Blog",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "copyright": "All rights reserved."
+    }
+  }
+}
