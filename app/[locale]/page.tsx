@@ -1,8 +1,9 @@
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, Award, Users, BookOpen, Zap } from "lucide-react"
 import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { Link } from "@/lib/i18n/routing"
+import { createClient } from "@/lib/supabase/server"
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -13,6 +14,17 @@ export default async function Home({ params }: Props) {
   setRequestLocale(locale);
   
   const t = await getTranslations('home')
+  const supabase = await createClient()
+  
+  // Fetch published courses
+  const { data: courses } = await supabase
+    .from("courses")
+    .select("*")
+    .eq("is_published", true)
+    .order("created_at", { ascending: false })
+    .limit(6)
+  
+  const featuredCourses = courses || []
   
   return (
     <main className="min-h-screen bg-background">
@@ -108,26 +120,32 @@ export default async function Home({ params }: Props) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="bg-gradient-to-br from-primary/20 to-accent/20 h-40" />
-              <CardHeader>
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
-                    {t(`courses.levels.${["beginner", "intermediate", "advanced"][i % 3] as "beginner" | "intermediate" | "advanced"}`)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{8 + i} {t('courses.hours')}</span>
-                </div>
-                <CardTitle>{t('courses.courseTitle')} {i + 1}</CardTitle>
-                <CardDescription>{t('courses.courseDescription')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link href="/auth/signup">
-                  <Button className="w-full">{t('courses.explore')}</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
+          {featuredCourses.length > 0 ? (
+            featuredCourses.map((course) => (
+              <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="bg-gradient-to-br from-primary/20 to-accent/20 h-40" />
+                <CardHeader>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded capitalize">
+                      {course.difficulty_level || t('courses.levels.beginner')}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{course.duration_hours || 0} {t('courses.hours')}</span>
+                  </div>
+                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                  <CardDescription className="line-clamp-2">{course.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link href={`/courses/${course.id}`}>
+                    <Button className="w-full">{t('courses.explore')}</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12">
+              <p className="text-muted-foreground">{t('courses.noCourses')}</p>
+            </div>
+          )}
         </div>
 
         <div className="text-center mt-12">

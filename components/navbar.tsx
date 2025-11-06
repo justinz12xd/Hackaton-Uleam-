@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "next-intl"
+import { Link } from "@/lib/i18n/routing"
 
 interface UserProfile {
   role: string
