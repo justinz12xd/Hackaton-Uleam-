@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Search } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
+import { useSearchParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 
 interface Course {
   id: string
@@ -28,10 +30,16 @@ export default function CoursesPage() {
   const [selectedLevel, setSelectedLevel] = useState<string>("All")
   const [isLoading, setIsLoading] = useState(true)
   const [status, setStatus] = useState<AccessStatus>("loading")
+  const [activeEvent, setActiveEvent] = useState<{ id: string; title: string | null } | null>(null)
+
+  const searchParams = useSearchParams()
+  const eventIdParam = searchParams.get("eventId")
+  const t = useTranslations("courses")
 
   useEffect(() => {
     fetchCourses()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventIdParam])
 
   useEffect(() => {
     if (status === "ready") {
@@ -41,10 +49,11 @@ export default function CoursesPage() {
 
   const fetchCourses = async () => {
     setIsLoading(true)
-    const supabase = createClient()
-
+    setStatus("loading")
     setCourses([])
     setFilteredCourses([])
+    setActiveEvent(null)
+    const supabase = createClient()
 
     try {
       const {
@@ -73,7 +82,30 @@ export default function CoursesPage() {
         .map((registration) => registration.event_id)
         .filter((eventId): eventId is string => Boolean(eventId))
 
-      if (verifiedEventIds.length === 0) {
+      let eventIdsToQuery = verifiedEventIds
+      let eventInfo: { id: string; title: string | null } | null = null
+
+      if (eventIdParam) {
+        const { data: eventData } = await supabase
+          .from("events")
+          .select("id, title")
+          .eq("id", eventIdParam)
+          .maybeSingle()
+
+        if (eventData) {
+          eventInfo = { id: eventData.id, title: eventData.title }
+        }
+
+        if (!verifiedEventIds.includes(eventIdParam)) {
+          setStatus("no-access")
+          setActiveEvent(eventInfo ?? { id: eventIdParam, title: null })
+          return
+        }
+
+        eventIdsToQuery = verifiedEventIds.filter((id) => id === eventIdParam)
+      }
+
+      if (eventIdsToQuery.length === 0) {
         setStatus("no-access")
         return
       }
@@ -93,7 +125,7 @@ export default function CoursesPage() {
              primary_event_id
            )`
         )
-        .in("event_id", verifiedEventIds)
+        .in("event_id", eventIdsToQuery)
         .eq("courses.is_published", true)
 
       if (eventCoursesError) {
@@ -123,6 +155,7 @@ export default function CoursesPage() {
 
       setCourses(accessibleCourses)
       setFilteredCourses(accessibleCourses)
+      setActiveEvent(eventInfo)
       setStatus("ready")
     } catch (error) {
       console.error("Unexpected error fetching courses:", error)
@@ -157,20 +190,35 @@ export default function CoursesPage() {
     setSelectedLevel(level)
   }
 
+  const backHref = useMemo(() => {
+    if (activeEvent?.id) {
+      return `/events/${activeEvent.id}`
+    }
+    return "/"
+  }, [activeEvent])
+
+  const pageTitle = activeEvent?.title
+    ? t("eventCoursesTitle", { event: activeEvent.title })
+    : t("allCourses")
+
+  const pageDescription = activeEvent?.title
+    ? t("eventCoursesDescription")
+    : t("exploreCatalog")
+
   return (
     <main className="min-h-screen bg-background">
       <div className="border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Link
-            href="/"
+            href={backHref}
             className="inline-flex items-center gap-2 text-primary hover:text-primary/80 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {activeEvent?.id ? t("backToEvent") : t("back")}
           </Link>
-          <h1 className="text-4xl font-bold text-foreground mb-2">All Courses</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-2">{pageTitle}</h1>
           <p className="text-lg text-muted-foreground">
-            Explore our complete catalog of microcredential programs
+            {pageDescription}
           </p>
         </div>
       </div>
@@ -293,11 +341,12 @@ export default function CoursesPage() {
               )}
               {status === "no-access" && (
                 <>
-                  <p className="text-lg font-semibold text-foreground">Verificación requerida</p>
-                  <p className="text-muted-foreground">
-                    Los cursos se habilitan automáticamente cuando tu asistencia se valida con el
-                    código QR del evento. Consulta a tu instructor si necesitas ayuda.
-                  </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {activeEvent?.title ? t("eventAccessRequired", { event: activeEvent.title }) : t("verificationRequiredTitle")}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {activeEvent?.title ? t("eventAccessRequiredDescription") : t("verificationRequiredDescription")}
+                    </p>
                 </>
               )}
             </CardContent>

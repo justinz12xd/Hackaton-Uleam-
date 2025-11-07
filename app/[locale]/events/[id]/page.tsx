@@ -1231,7 +1231,7 @@ export default function EventDetailPage() {
                           )}
 
                           {/* Button to see available courses - Simplified with gradient */}
-                          <Link href="/courses" className="block mt-4">
+                          <Link href={`/courses?eventId=${event.id}`} className="block mt-4">
                             <Button className="w-full gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
                               {t('viewRelatedCourses')}
                             </Button>
