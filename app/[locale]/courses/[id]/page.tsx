@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Clock, Award, Users } from "lucide-react"
+import { ArrowLeft, Clock, Award, Users, BookOpen, PlayCircle } from "lucide-react"
 import { Link, redirect } from "@/lib/i18n/routing"
+import type { CourseContent } from "@/lib/types/course-content"
 
 interface CoursePageProps {
   params: Promise<{
@@ -25,7 +26,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
     .single()
 
   if (!courseResponse.data) {
-    redirect('/courses')
+    redirect({ href: '/courses', locale })
   }
 
   const course = courseResponse.data
@@ -33,13 +34,31 @@ export default async function CoursePage({ params }: CoursePageProps) {
 
   // Check if user is enrolled
   const enrollmentResponse = await supabase
-    .from("enrollments")
+    .from("course_enrollments")
     .select("*")
     .eq("course_id", id)
     .eq("student_id", user?.user?.id || "")
     .single()
 
   const isEnrolled = !!enrollmentResponse.data
+
+  // Parsear el contenido del curso
+  let courseContent: CourseContent | null = null
+  try {
+    if (course.content) {
+      courseContent = typeof course.content === 'string' 
+        ? JSON.parse(course.content) 
+        : course.content
+    }
+  } catch (error) {
+    console.error('Error parsing course content:', error)
+  }
+
+  // Contar lecciones totales
+  const totalLessons = courseContent?.modules?.reduce(
+    (total, module) => total + (module.lessons?.length || 0),
+    0
+  ) || 0
 
   return (
     <main className="min-h-screen bg-background">
@@ -95,18 +114,67 @@ export default async function CoursePage({ params }: CoursePageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Course Content</CardTitle>
+                {courseContent && courseContent.modules.length > 0 && (
+                  <CardDescription>
+                    {courseContent.modules.length} módulos • {totalLessons} lecciones
+                  </CardDescription>
+                )}
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                      <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold">
-                        {i}
+                {courseContent && courseContent.modules.length > 0 ? (
+                  <div className="space-y-3">
+                    {courseContent.modules.map((module, index) => (
+                      <div key={module.id} className="border rounded-lg overflow-hidden">
+                        <div className="flex items-start gap-3 p-4 bg-muted/30">
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-semibold shrink-0 mt-0.5">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-foreground">{module.title}</h4>
+                            {module.description && (
+                              <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <BookOpen className="w-3 h-3" />
+                                {module.lessons?.length || 0} lecciones
+                              </span>
+                              {module.duration && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {module.duration} min
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {module.lessons && module.lessons.length > 0 && (
+                          <div className="p-4 space-y-2 bg-background">
+                            {module.lessons.map((lesson, lessonIndex) => (
+                              <div
+                                key={lesson.id}
+                                className="flex items-center gap-2 text-sm py-2 px-3 rounded hover:bg-muted/50 transition-colors"
+                              >
+                                <PlayCircle className="w-4 h-4 text-primary shrink-0" />
+                                <span className="flex-1">{lesson.title}</span>
+                                {lesson.duration && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {lesson.duration} min
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <p className="text-foreground">Module {i}: Course Content</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Este curso aún no tiene contenido disponible</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -122,9 +190,14 @@ export default async function CoursePage({ params }: CoursePageProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isEnrolled ? (
-                  <Link href="/dashboard">
-                    <Button className="w-full">Continue Learning</Button>
-                  </Link>
+                  <>
+                    <Link href={`/courses/${id}/learn`}>
+                      <Button className="w-full">Comenzar a Aprender</Button>
+                    </Link>
+                    <Link href="/dashboard">
+                      <Button variant="outline" className="w-full">Ver Dashboard</Button>
+                    </Link>
+                  </>
                 ) : (
                   <>
                     {user?.user ? (
