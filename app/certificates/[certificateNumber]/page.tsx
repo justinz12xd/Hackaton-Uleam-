@@ -2,6 +2,7 @@ import CertificateView from "@/components/certificates/certificate-view"
 import { createServiceClient } from "@/lib/supabase/service"
 import { notFound } from "next/navigation"
 import QRCode from "qrcode"
+import { getBaseUrl } from "@/lib/utils/url"
 
 interface CertificatePageProps {
   params: Promise<{
@@ -55,7 +56,7 @@ export default async function CertificatePublicPage({ params }: CertificatePageP
       day: "numeric",
     })
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ""
+  const baseUrl = getBaseUrl()
   const verificationUrl = metadata.verificationUrl || `${baseUrl.replace(/\/$/, "")}/certificates/${certificateNumber}`
 
   let qrCodeDataUrl = metadata.qrCodeDataUrl || null
