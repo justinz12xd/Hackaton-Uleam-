@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import QRCode from "qrcode"
 import { sendEmail } from "@/lib/email/resend"
 import { renderCertificateEmail } from "@/components/emails/certificate-email"
+import { createAbsoluteUrl } from "@/lib/utils/url"
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,8 +48,7 @@ export async function POST(request: NextRequest) {
     // Generate certificate number
     const certificateNumber = `EDUC-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
-    const verificationUrl = `${baseUrl.replace(/\/$/, "")}/certificates/${certificateNumber}`
+    const verificationUrl = createAbsoluteUrl(`/certificates/${certificateNumber}`, request)
     const qrCodeDataUrl = await QRCode.toDataURL(verificationUrl, { margin: 1 })
 
     // Check if microcredential already exists
