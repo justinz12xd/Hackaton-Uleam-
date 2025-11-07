@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { QrCode, CheckCircle, XCircle, ArrowLeft } from "lucide-react"
+import { QrCode, CheckCircle, XCircle, ArrowLeft, Camera } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
+import { QrScanner } from "@/components/qr-scanner"
 
 export default function CheckInPage() {
   const [qrCode, setQrCode] = useState("")
   const [isChecking, setIsChecking] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
   const [result, setResult] = useState<{
     success: boolean
     message: string
@@ -120,6 +122,19 @@ export default function CheckInPage() {
     }
   }
 
+  const handleScanSuccess = (decodedText: string) => {
+    setQrCode(decodedText)
+    setShowScanner(false)
+    // Auto check-in after scan
+    setTimeout(() => {
+      const input = document.querySelector('input[type="text"]') as HTMLInputElement
+      if (input) {
+        input.value = decodedText
+        setQrCode(decodedText)
+      }
+    }, 100)
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -141,16 +156,27 @@ export default function CheckInPage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium">QR Code</label>
-              <Input
-                placeholder="Enter QR code or scan..."
-                value={qrCode}
-                onChange={(e) => setQrCode(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="text-center font-mono"
-                autoFocus
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter QR code or scan..."
+                  value={qrCode}
+                  onChange={(e) => setQrCode(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="text-center font-mono flex-1"
+                  autoFocus
+                />
+                <Button
+                  onClick={() => setShowScanner(true)}
+                  variant="outline"
+                  size="icon"
+                  title="Scan with camera"
+                  className="shrink-0"
+                >
+                  <Camera className="w-4 h-4" />
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground text-center">
-                Paste the QR code value or use a scanner
+                Paste the QR code value, scan with camera, or use a scanner
               </p>
             </div>
 
@@ -194,13 +220,21 @@ export default function CheckInPage() {
               <h3 className="font-semibold mb-2">Instructions:</h3>
               <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                 <li>Ask the attendee to show their QR code</li>
-                <li>Scan or manually enter the QR code value</li>
+                <li>Click the camera icon to scan, or manually enter the code</li>
                 <li>Click "Check In" to mark attendance</li>
                 <li>Attendee will get access to event resources</li>
               </ol>
             </div>
           </CardContent>
         </Card>
+
+        {/* QR Scanner Modal */}
+        {showScanner && (
+          <QrScanner
+            onScanSuccess={handleScanSuccess}
+            onClose={() => setShowScanner(false)}
+          />
+        )}
 
         {/* Quick Stats */}
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">

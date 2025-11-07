@@ -64,9 +64,6 @@ export function Navbar() {
                 <Button variant="ghost">Events</Button>
               </Link>
               <UserSearch />
-              <Link href="/courses">
-                <Button variant="ghost">{t('courses')}</Button>
-              </Link>
               {profile?.role === "instructor" || profile?.role === "admin" ? (
                 <Link href="/instructor">
                   <Button variant="ghost">{t('instructor')}</Button>
@@ -87,9 +84,6 @@ export function Navbar() {
                 <Button variant="ghost">Events</Button>
               </Link>
               <UserSearch />
-              <Link href="/courses">
-                <Button variant="ghost">{t('browseCourses')}</Button>
-              </Link>
               <Link href="/auth/login">
                 <Button variant="ghost">{t('login')}</Button>
               </Link>
