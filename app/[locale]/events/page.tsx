@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button"
 import { Calendar, Plus } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
 import { EventsClient } from "./events-client"
+import { getTranslations } from "next-intl/server"
 
 export default async function EventsPage() {
+  const t = await getTranslations('events')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -64,13 +66,13 @@ export default async function EventsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <h1 className="text-5xl font-bold mb-2">Eventos</h1>
+              <h1 className="text-5xl font-bold mb-2">{t('title')}</h1>
               <div className="flex gap-4 mt-6">
                 <Button variant="ghost" className="hover:bg-accent">
-                  Próximos
+                  {t('upcoming')}
                 </Button>
                 <Button variant="ghost" className="text-muted-foreground hover:bg-accent hover:text-foreground">
-                  Pasados
+                  {t('past')}
                 </Button>
               </div>
             </div>
@@ -79,7 +81,7 @@ export default async function EventsPage() {
                 <Link href="/events/create">
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
-                    Crear evento
+                    {t('createEvent')}
                   </Button>
                 </Link>
               </div>

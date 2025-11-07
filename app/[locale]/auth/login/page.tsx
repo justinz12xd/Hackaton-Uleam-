@@ -49,8 +49,9 @@ export default function LoginPage() {
           console.error("Error fetching profile:", profileError)
         }
 
+        // Actualizar el store de Zustand primero
+        console.log("Updating Zustand store with user and profile")
         if (profile) {
-          // Update Zustand store
           login(data.user, profile)
         } else {
           // Si no hay perfil, aún así establecer el usuario
@@ -65,6 +66,17 @@ export default function LoginPage() {
             updated_at: new Date().toISOString(),
           })
         }
+        
+        // Verificar que el estado se actualizó
+        const updatedState = useAuthStore.getState()
+        console.log("Store updated:", {
+          user: updatedState.user?.email,
+          profile: updatedState.profile?.full_name,
+          isAuthenticated: updatedState.isAuthenticated
+        })
+
+        // Establecer isLoading en false
+        setIsLoading(false)
 
         // Redirigir según el rol del usuario
         const redirectPath = profile?.role === 'admin' || profile?.role === 'instructor' 
@@ -76,6 +88,11 @@ export default function LoginPage() {
         const localeMatch = currentPath.match(/^\/([a-z]{2})\//)
         const locale = localeMatch ? localeMatch[1] : 'es'
         
+        // Forzar un pequeño delay para asegurar que el estado se propague a todos los componentes
+        // antes de redirigir
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
+        // Redirigir - window.location.href fuerza una recarga completa
         window.location.href = `/${locale}${redirectPath}`
       }
     } catch (error: unknown) {

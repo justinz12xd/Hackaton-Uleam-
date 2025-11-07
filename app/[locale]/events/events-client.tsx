@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Calendar, MapPin, Users } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
+import { useTranslations } from "next-intl"
 
 interface Event {
   id: string
@@ -26,6 +27,7 @@ interface EventsClientProps {
 }
 
 export function EventsClient({ initialEvents, user }: EventsClientProps) {
+  const t = useTranslations('events')
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
@@ -48,10 +50,10 @@ export function EventsClient({ initialEvents, user }: EventsClientProps) {
     const now = new Date()
     const eventDate = new Date(event.event_date)
 
-    if (event.status === "completed") return "Completed"
-    if (event.status === "ongoing") return "Ongoing"
-    if (eventDate < now) return "Past"
-    return "Upcoming"
+    if (event.status === "completed") return t('completed')
+    if (event.status === "ongoing") return t('ongoing')
+    if (eventDate < now) return t('pastEvent')
+    return t('upcomingEvent')
   }
 
   // Group events by date
@@ -111,10 +113,10 @@ export function EventsClient({ initialEvents, user }: EventsClientProps) {
                           <div className="flex-1 min-w-0">
                             {/* Status Badge */}
                             <div className="flex items-center gap-2 mb-2">
-                              {getEventStatus(event) === "Ongoing" && (
+                              {event.status === "ongoing" && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-500">
                                   <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                  EN VIVO
+                                  {t('live')}
                                 </span>
                               )}
                               <span className="text-sm text-muted-foreground">{formatTime(event.event_date)}</span>
@@ -129,7 +131,7 @@ export function EventsClient({ initialEvents, user }: EventsClientProps) {
                             <div className="space-y-1 mb-3">
                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Users className="w-4 h-4" />
-                                <span className="line-clamp-1">{event.registrations_count || 0} asistentes</span>
+                                <span className="line-clamp-1">{event.registrations_count || 0} {t('attendees')}</span>
                               </div>
                               {event.location && (
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -143,11 +145,11 @@ export function EventsClient({ initialEvents, user }: EventsClientProps) {
                             <div className="flex items-center gap-3">
                               {event.is_registered ? (
                                 <span className="px-3 py-1 rounded text-sm font-medium bg-green-500/10 text-green-600">
-                                  Registrado
+                                  {t('registered')}
                                 </span>
                               ) : (
                                 <span className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                                  Unirse al evento →
+                                  {t('joinEventArrow')}
                                 </span>
                               )}
                               {(event.registrations_count ?? 0) > 0 && (
@@ -179,10 +181,10 @@ export function EventsClient({ initialEvents, user }: EventsClientProps) {
       ) : (
         <div className="text-center py-12">
           <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground text-lg mb-4">No hay eventos disponibles</p>
+          <p className="text-muted-foreground text-lg mb-4">{t('noEventsAvailable')}</p>
           {user && (
             <Link href="/events/create">
-              <Button>Crear el primer evento</Button>
+              <Button>{t('createFirstEvent')}</Button>
             </Link>
           )}
         </div>

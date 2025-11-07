@@ -32,6 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useTranslations } from "next-intl"
 
 interface UserProfile {
   id: string
@@ -57,6 +58,7 @@ export function UserSearch() {
   const [events, setEvents] = useState<AttendedEvent[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [isLoadingEvents, setIsLoadingEvents] = useState(false)
+  const t = useTranslations('userSearch')
 
   // Memoizar el cliente de Supabase para evitar recrearlo en cada render
   const supabase = useMemo(() => createClient(), [])
@@ -174,17 +176,17 @@ export function UserSearch() {
       }
 
       // Combinar los datos
-      const formattedEvents = registrations.map((reg) => {
-        const eventData = eventsData?.find(e => e.id === reg.event_id)
-        return {
-          id: reg.id,
-          event_title: eventData?.title || 'Unknown Event',
-          event_date: eventData?.event_date || new Date().toISOString(),
-          location: eventData?.location || 'Unknown Location',
-          attended_at: reg.attended_at,
-          is_collaborator: reg.is_collaborator,
-        }
-      })
+        const formattedEvents = registrations.map((reg) => {
+          const eventData = eventsData?.find(e => e.id === reg.event_id)
+          return {
+            id: reg.id,
+            event_title: eventData?.title || t('unknownEvent'),
+            event_date: eventData?.event_date || new Date().toISOString(),
+            location: eventData?.location || t('unknownLocation'),
+            attended_at: reg.attended_at,
+            is_collaborator: reg.is_collaborator,
+          }
+        })
 
       setEvents(formattedEvents)
     } catch (err) {
@@ -224,14 +226,14 @@ export function UserSearch() {
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2">
           <Search className="w-4 h-4" />
-          <span className="hidden md:inline">Search Users</span>
+          <span className="hidden md:inline">{t('search')}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Search Users & Microcredentials</DialogTitle>
+          <DialogTitle>{t('title')}</DialogTitle>
           <DialogDescription>
-            Find users and view their earned microcredentials
+            {t('description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -240,7 +242,7 @@ export function UserSearch() {
           <div className="relative">
             <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name or email..."
+              placeholder={t('searchPlaceholder')}
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -256,7 +258,7 @@ export function UserSearch() {
                   <CommandList>
                     {isLoadingUsers ? (
                       <div className="py-6 text-center text-sm text-muted-foreground">
-                        Searching...
+                        {t('searching')}
                       </div>
                     ) : users.length > 0 ? (
                       <CommandGroup>
@@ -280,7 +282,7 @@ export function UserSearch() {
                             </Avatar>
                             <div className="flex-1">
                               <p className="font-medium">
-                                {user.full_name || "No name"}
+                                {user.full_name || t('noName')}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {user.email}
@@ -290,10 +292,10 @@ export function UserSearch() {
                         ))}
                       </CommandGroup>
                     ) : searchQuery.length > 2 ? (
-                      <CommandEmpty>No users found</CommandEmpty>
+                      <CommandEmpty>{t('noUsers')}</CommandEmpty>
                     ) : (
                       <div className="py-6 text-center text-sm text-muted-foreground">
-                        Type at least 3 characters to search
+                        {t('typeToSearch')}
                       </div>
                     )}
                   </CommandList>
@@ -318,7 +320,7 @@ export function UserSearch() {
                   </Avatar>
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">
-                      {selectedUser.full_name || "No name"}
+                      {selectedUser.full_name || t('noName')}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       {selectedUser.email}
@@ -332,7 +334,7 @@ export function UserSearch() {
                       setEvents([])
                     }}
                   >
-                    Back
+                    {t('back')}
                   </Button>
                 </div>
 
@@ -341,13 +343,13 @@ export function UserSearch() {
                   <div className="flex items-center gap-2 mb-3">
                     <Calendar className="w-5 h-5 text-primary" />
                     <h4 className="font-semibold">
-                      Eventos Asistidos ({events.length})
+                      {t('attendedEventsCount', { count: events.length })}
                     </h4>
                   </div>
 
                   {isLoadingEvents ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      Cargando eventos...
+                      {t('loadingEvents')}
                     </div>
                   ) : events.length > 0 ? (
                     <div className="space-y-3">
@@ -358,7 +360,7 @@ export function UserSearch() {
                               <span className="flex-1">{event.event_title}</span>
                               <Badge variant="secondary" className="ml-2">
                                 <CheckCircle className="w-3 h-3 mr-1" />
-                                Asistió
+                                {t('attended')}
                               </Badge>
                             </CardTitle>
                           </CardHeader>
@@ -374,12 +376,12 @@ export function UserSearch() {
                               </div>
                             )}
                             <div className="text-xs text-muted-foreground pt-1">
-                              Asistió: {formatDate(event.attended_at)}
+                              {t('attendedAt')} {formatDate(event.attended_at)}
                             </div>
                             {event.is_collaborator && (
                               <Badge variant="outline" className="mt-2">
                                 <Users className="w-3 h-3 mr-1" />
-                                Colaborador
+                                {t('collaborator')}
                               </Badge>
                             )}
                           </CardContent>
@@ -390,7 +392,7 @@ export function UserSearch() {
                     <Card>
                       <CardContent className="py-8 text-center text-muted-foreground">
                         <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No ha asistido a ningún evento aún</p>
+                        <p>{t('noEvents')}</p>
                       </CardContent>
                     </Card>
                   )}
