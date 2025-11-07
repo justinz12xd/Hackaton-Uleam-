@@ -1,15 +1,20 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Users, Eye, Plus } from "lucide-react"
+import { BookOpen, Users, Eye, Plus, FileText } from "lucide-react"
 import { Link, redirect } from "@/lib/i18n/routing"
 
-export default async function InstructorDashboardPage() {
+interface InstructorDashboardPageProps {
+  params: Promise<{ locale: string }>
+}
+
+export default async function InstructorDashboardPage({ params }: InstructorDashboardPageProps) {
+  const { locale } = await params
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getUser()
 
   if (error || !data?.user) {
-    redirect("/auth/login")
+    redirect({ href: "/auth/login", locale })
   }
 
   // Fetch instructor profile
@@ -19,7 +24,7 @@ export default async function InstructorDashboardPage() {
 
   // Check if user is instructor
   if (profile?.role !== "instructor" && profile?.role !== "admin") {
-    redirect("/dashboard")
+    redirect({ href: "/dashboard", locale })
   }
 
   // Fetch instructor's courses
@@ -121,16 +126,24 @@ export default async function InstructorDashboardPage() {
                       <Users className="w-4 h-4" />
                       <span>{0} students enrolled</span>
                     </div>
-                    <div className="flex gap-2">
-                      <Link href={`/instructor/${course.id}/edit`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full bg-transparent">
-                          Edit
-                        </Button>
-                      </Link>
-                      <Link href={`/courses/${course.id}`} className="flex-1">
-                        <Button variant="ghost" size="sm" className="w-full gap-2">
-                          <Eye className="w-3 h-3" />
-                          View
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <Link href={`/instructor/${course.id}/edit`} className="flex-1">
+                          <Button variant="outline" size="sm" className="w-full bg-transparent">
+                            Edit
+                          </Button>
+                        </Link>
+                        <Link href={`/courses/${course.id}`} className="flex-1">
+                          <Button variant="ghost" size="sm" className="w-full gap-2">
+                            <Eye className="w-3 h-3" />
+                            View
+                          </Button>
+                        </Link>
+                      </div>
+                      <Link href={`/instructor/${course.id}/content`} className="w-full">
+                        <Button variant="default" size="sm" className="w-full gap-2">
+                          <FileText className="w-3 h-3" />
+                          Edit Content
                         </Button>
                       </Link>
                     </div>

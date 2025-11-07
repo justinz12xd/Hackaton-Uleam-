@@ -18,7 +18,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   const { data, error } = await supabase.auth.getUser()
 
   if (error || !data?.user) {
-    redirect("/auth/login")
+    redirect({ href: "/auth/login", locale })
   }
 
   // Fetch user profile and enrolled courses
@@ -145,7 +145,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                         />
                       </div>
                     </div>
-                    <Link href={`/courses/${enrollment.course?.id}`}>
+                    <Link href={`/courses/${enrollment.course?.id}/learn`}>
                       <Button className="w-full" size="sm">
                         {t('continueLearning')}
                       </Button>
