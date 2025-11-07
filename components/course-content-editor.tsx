@@ -34,6 +34,7 @@ import {
   countTotalLessons,
 } from '@/lib/types/course-content'
 import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
 
 interface CourseContentEditorProps {
   courseId: string
@@ -45,6 +46,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
   const [content, setContent] = useState<CourseContent>({ modules: [] })
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPublished, setIsPublished] = useState(false)
 
   // Cargar contenido existente
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
       if (response.ok) {
         const data = await response.json()
         setContent(data.content || { modules: [] })
+        setIsPublished(Boolean(data.isPublished))
       }
     } catch (error) {
       console.error('Error loading content:', error)
@@ -69,18 +72,26 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
   const saveContent = async () => {
     setIsSaving(true)
     try {
-      const response = await fetch(`/api/courses/${courseId}/content`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      })
+      const wasPublished = isPublished
+  const response = await fetch(`/api/courses/${courseId}/content`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Error al guardar')
-      }
+  const result = await response.json()
 
+  if (!response.ok) {
+    throw new Error(result.error || 'Error al guardar')
+  }
+      setIsPublished(Boolean(result.isPublished))
       toast.success('Contenido guardado exitosamente')
+
+      if (result.isPublished && !wasPublished) {
+        toast.success('El curso se ha publicado automáticamente para los asistentes verificados')
+      } else if (!result.isPublished) {
+        toast.warning('Agrega al menos una lección para publicar el curso')
+      }
     } catch (error) {
       console.error('Error saving content:', error)
       toast.error(error instanceof Error ? error.message : 'Error al guardar')
@@ -209,6 +220,9 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
                 <p className="text-sm text-muted-foreground">{courseTitle}</p>
               </div>
             </div>
+            <Badge variant={isPublished ? 'default' : 'secondary'} className="uppercase tracking-wide">
+              {isPublished ? 'Publicado' : 'Borrador'}
+            </Badge>
             <Button onClick={saveContent} disabled={isSaving}>
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Guardando...' : 'Guardar Cambios'}

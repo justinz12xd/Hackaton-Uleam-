@@ -17,7 +17,7 @@ export async function GET(
     // Obtener contenido del curso
     const { data: course, error } = await supabase
       .from('courses')
-      .select('id, title, content, instructor_id')
+      .select('id, title, content, instructor_id, is_published')
       .eq('id', courseId)
       .single()
 
@@ -30,6 +30,7 @@ export async function GET(
       content: course.content || { modules: [] },
       courseId: course.id,
       title: course.title,
+      isPublished: course.is_published,
     })
   } catch (error) {
     console.error('Error fetching course content:', error)
@@ -72,7 +73,7 @@ export async function PUT(
     // Verificar que el usuario sea el instructor del curso
     const { data: course, error: courseError } = await supabase
       .from('courses')
-      .select('instructor_id')
+      .select('instructor_id, is_published')
       .eq('id', courseId)
       .single()
 
@@ -97,11 +98,16 @@ export async function PUT(
     }
 
     // Actualizar el contenido
+    const hasModules = Array.isArray(content.modules) && content.modules.length > 0
+    const hasLessons = hasModules && content.modules.some((module) => Array.isArray(module.lessons) && module.lessons.length > 0)
+    const shouldPublish = hasLessons
+
     const { error: updateError } = await supabase
       .from('courses')
       .update({
         content,
         updated_at: new Date().toISOString(),
+        is_published: shouldPublish,
       })
       .eq('id', courseId)
 
@@ -116,6 +122,7 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       message: 'Contenido actualizado exitosamente',
+      isPublished: shouldPublish,
     })
   } catch (error) {
     console.error('Error updating course content:', error)

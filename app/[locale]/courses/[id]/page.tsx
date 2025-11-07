@@ -16,9 +16,9 @@ export default async function CoursePage({ params }: CoursePageProps) {
   const { locale, id } = await params
   const supabase = await createClient()
 
-  const { data: user } = await supabase.auth.getUser()
+  const { data: authUser } = await supabase.auth.getUser()
+  const userId = authUser?.user?.id ?? null
 
-  // Fetch course details with instructor information
   const courseResponse = await supabase
     .from("courses")
     .select("*, instructor:profiles!instructor_id(full_name)")
@@ -26,21 +26,84 @@ export default async function CoursePage({ params }: CoursePageProps) {
     .single()
 
   if (!courseResponse.data) {
-    redirect({ href: '/courses', locale })
+    redirect({ href: "/courses", locale })
   }
 
   const course = courseResponse.data
-  const instructor = course.instructor as { full_name: string } | null
+  const instructor = (course.instructor as { full_name: string } | null) ?? null
+  const isInstructor = userId === course.instructor_id
 
-  // Check if user is enrolled
-  const enrollmentResponse = await supabase
-    .from("course_enrollments")
-    .select("*")
+  let userRole: string | null = null
+  if (userId && !isInstructor) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle()
+
+    userRole = profile?.role ?? null
+  }
+
+  const isAdmin = userRole === "admin"
+
+  const linkedEventIds = new Set<string>()
+  if (course.primary_event_id) {
+    linkedEventIds.add(course.primary_event_id)
+  }
+
+  const { data: eventLinks } = await supabase
+    .from("event_courses")
+    .select("event_id")
     .eq("course_id", id)
-    .eq("student_id", user?.user?.id || "")
-    .single()
 
-  const isEnrolled = !!enrollmentResponse.data
+  eventLinks?.forEach((link) => {
+    if (link?.event_id) {
+      linkedEventIds.add(link.event_id)
+    }
+  })
+
+  const eventIds = Array.from(linkedEventIds)
+  let hasEventAccess = false
+
+  if (eventIds.length > 0) {
+    if (!userId) {
+      redirect({ href: "/auth/login", locale })
+    } else {
+      const { data: verifiedRegistrations } = await supabase
+        .from("event_registrations")
+        .select("id")
+        .eq("user_id", userId)
+        .in("event_id", eventIds)
+        .eq("is_attended", true)
+
+      hasEventAccess = (verifiedRegistrations?.length ?? 0) > 0
+    }
+  }
+
+  let hasEnrollmentAccess = false
+  if (eventIds.length === 0 && userId) {
+    const { data: enrollment } = await supabase
+      .from("course_enrollments")
+      .select("id")
+      .eq("course_id", id)
+      .eq("student_id", userId)
+      .maybeSingle()
+
+    hasEnrollmentAccess = Boolean(enrollment)
+  }
+
+  const isCoursePublished = course.is_published
+  const hasAccess =
+    isInstructor ||
+    isAdmin ||
+    (eventIds.length > 0 ? hasEventAccess : hasEnrollmentAccess)
+
+  if (!hasAccess || (!isCoursePublished && !isInstructor && !isAdmin)) {
+    redirect({ href: "/courses", locale })
+  }
+
+  const isEventCourse = eventIds.length > 0
+  const isEnrolled = isEventCourse ? hasEventAccess : hasEnrollmentAccess
 
   // Parsear el contenido del curso
   let courseContent: CourseContent | null = null
@@ -105,7 +168,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
                   <div>
                     <Users className="w-4 h-4 text-primary mb-2" />
                     <p className="text-sm text-muted-foreground">Difficulty</p>
-                    <p className="font-semibold">{course.difficulty}</p>
+                    <p className="font-semibold">{course.difficulty_level}</p>
                   </div>
                 </div>
               </CardContent>
@@ -139,12 +202,6 @@ export default async function CoursePage({ params }: CoursePageProps) {
                                 <BookOpen className="w-3 h-3" />
                                 {module.lessons?.length || 0} lecciones
                               </span>
-                              {module.duration && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {module.duration} min
-                                </span>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -185,7 +242,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
               <CardHeader>
                 <CardTitle className="text-lg">{course.title}</CardTitle>
                 <CardDescription className="text-base font-semibold text-primary mt-2">
-                  {isEnrolled ? "You are enrolled" : "Not enrolled"}
+                  {isEnrolled ? "Acceso habilitado" : "Acceso restringido"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -195,13 +252,17 @@ export default async function CoursePage({ params }: CoursePageProps) {
                       <Button className="w-full">Comenzar a Aprender</Button>
                     </Link>
                     <Link href="/dashboard">
-                      <Button variant="outline" className="w-full">Ver Dashboard</Button>
+                      <Button variant="outline" className="w-full">
+                        Ver Dashboard
+                      </Button>
                     </Link>
                   </>
                 ) : (
                   <>
-                    {user?.user ? (
-                      <Button className="w-full">Enroll Now</Button>
+                    {userId ? (
+                      <Button className="w-full" disabled>
+                        Acceso pendiente de verificación QR
+                      </Button>
                     ) : (
                       <Link href="/auth/signup" className="w-full">
                         <Button className="w-full">Sign Up to Enroll</Button>
@@ -211,7 +272,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
                 )}
                 <div className="space-y-2 text-sm text-muted-foreground border-t pt-4">
                   <p>Duration: {course.duration_hours} hours</p>
-                  <p>Level: {course.difficulty}</p>
+                  <p>Level: {course.difficulty_level}</p>
                   <p>Instructor: {instructor?.full_name || "Unknown"}</p>
                 </div>
               </CardContent>

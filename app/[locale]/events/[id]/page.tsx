@@ -79,6 +79,7 @@ export default function EventDetailPage() {
   const [resourceType, setResourceType] = useState<string>("document")
   const [eventResources, setEventResources] = useState<any[]>([])
   const [isResourcesOpen, setIsResourcesOpen] = useState(false)
+  const [eventCourses, setEventCourses] = useState<any[]>([])
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const supabase = createClient()
 
@@ -137,6 +138,7 @@ export default function EventDetailPage() {
     if (user && event) {
       setIsOrganizer(user.id === event.organizer_id)
       fetchEventResources()
+      fetchEventCourses()
     }
   }, [user, event])
 
@@ -248,6 +250,33 @@ export default function EventDetailPage() {
 
     console.log("📦 Recursos cargados:", data)
     setEventResources(data || [])
+  }
+
+  const fetchEventCourses = async () => {
+    if (!event) return
+
+    const { data, error } = await supabase
+      .from('event_courses')
+      .select(`
+        id,
+        course_id,
+        courses (
+          id,
+          title,
+          description,
+          is_published,
+          created_at
+        )
+      `)
+      .eq('event_id', event.id)
+
+    if (error) {
+      console.error("Error fetching event courses:", error)
+      return
+    }
+
+    console.log("📚 Cursos del evento:", data)
+    setEventCourses(data || [])
   }
 
   const fetchAttendees = async () => {
@@ -947,6 +976,61 @@ export default function EventDetailPage() {
                       <Upload className="w-4 h-4" />
                       Añadir Recursos
                     </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Manage Courses */}
+                <Card className="border-blue-500">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Cursos del Evento
+                    </CardTitle>
+                    <CardDescription>
+                      Crea y gestiona cursos asociados a este evento
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Link href={`/instructor/create?eventId=${event.id}`}>
+                      <Button className="w-full gap-2" variant="default">
+                        <FileText className="w-4 h-4" />
+                        Crear Nuevo Curso
+                      </Button>
+                    </Link>
+
+                    {eventCourses.length > 0 && (
+                      <div className="space-y-2 mt-4">
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Cursos asociados ({eventCourses.length}):
+                        </p>
+                        {eventCourses.map((eventCourse: any) => (
+                          <Link 
+                            key={eventCourse.id} 
+                            href={`/instructor/${eventCourse.courses.id}/content`}
+                            className="block"
+                          >
+                            <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                              <p className="font-medium text-sm">
+                                {eventCourse.courses.title}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant={eventCourse.courses.is_published ? "default" : "secondary"} className="text-xs">
+                                  {eventCourse.courses.is_published ? "Publicado" : "Borrador"}
+                                </Badge>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
+                    {eventCourses.length === 0 && (
+                      <Alert>
+                        <AlertDescription className="text-sm">
+                          No hay cursos asociados aún. Crea uno para tus asistentes.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </CardContent>
                 </Card>
 

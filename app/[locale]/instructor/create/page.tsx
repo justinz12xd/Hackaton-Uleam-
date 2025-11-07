@@ -2,9 +2,10 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "@/lib/i18n/routing"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter as useI18nRouter } from "@/lib/i18n/routing"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,8 +14,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function CreateCoursePage() {
+  const searchParams = useSearchParams()
+  const eventId = searchParams.get('eventId')
+  const [event, setEvent] = useState<any>(null)
+  
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -24,8 +30,32 @@ export default function CreateCoursePage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const i18nRouter = useI18nRouter()
   const supabase = createClient()
+
+  // Fetch event details if eventId is provided
+  useEffect(() => {
+    if (eventId) {
+      fetchEvent()
+    }
+  }, [eventId])
+
+  const fetchEvent = async () => {
+    if (!eventId) return
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('id, title')
+      .eq('id', eventId)
+      .single()
+
+    if (error) {
+      console.error("Error fetching event:", error)
+      return
+    }
+
+    setEvent(data)
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -75,6 +105,7 @@ export default function CreateCoursePage() {
             duration_hours: Number.parseInt(formData.duration_hours),
             is_published: false,
             content: { modules: [] }, // Agregar contenido vacío por defecto
+            primary_event_id: eventId || null,
           },
         ])
         .select()
@@ -86,7 +117,32 @@ export default function CreateCoursePage() {
       }
 
       console.log("Course created successfully:", data)
-      router.push("/instructor")
+      
+      // If eventId exists, link the course to the event
+      if (eventId && data) {
+        const { error: linkError } = await supabase
+          .from('event_courses')
+          .insert([
+            {
+              event_id: eventId,
+              course_id: data.id,
+            }
+          ])
+
+        if (linkError) {
+          console.error("Error linking course to event:", linkError)
+          // Don't throw, course was created successfully
+        } else {
+          console.log("Course linked to event successfully")
+        }
+      }
+
+      // Redirect based on context
+      if (eventId) {
+        i18nRouter.push(`/events/${eventId}`)
+      } else {
+        i18nRouter.push("/instructor")
+      }
     } catch (err: unknown) {
       console.error("Error completo:", err)
       setError(err instanceof Error ? err.message : "Ocurrió un error desconocido")
@@ -113,6 +169,14 @@ export default function CreateCoursePage() {
 
       {/* Form */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {event && (
+          <Alert className="mb-6 bg-blue-500/10 border-blue-500/20">
+            <AlertDescription className="text-blue-700 dark:text-blue-400">
+              📚 Creando curso para el evento: <strong>{event.title}</strong>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Card>
           <CardHeader>
             <CardTitle>Course Information</CardTitle>
