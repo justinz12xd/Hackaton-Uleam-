@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -58,62 +58,142 @@ export function UserSearch() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [isLoadingEvents, setIsLoadingEvents] = useState(false)
 
-  const supabase = createClient()
+  // Memoizar el cliente de Supabase para evitar recrearlo en cada render
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    if (searchQuery.length > 2) {
-      searchUsers()
-    } else {
+  // Memoizar la función de búsqueda para evitar recrearla en cada render
+  const performSearch = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 3) {
       setUsers([])
+      setIsLoadingUsers(false)
+      return
     }
-  }, [searchQuery])
 
-  const searchUsers = async () => {
     setIsLoadingUsers(true)
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, email, full_name, avatar_url")
-      .or(`email.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`)
-      .limit(10)
+    setUsers([])
 
-    if (!error && data) {
-      setUsers(data)
+    try {
+      const trimmedQuery = query.trim()
+      const searchPattern = `%${trimmedQuery}%`
+
+      // Hacer las búsquedas reales
+      const [emailResponse, nameResponse] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, email, full_name, avatar_url")
+          .ilike("email", searchPattern)
+          .limit(10),
+        supabase
+          .from("profiles")
+          .select("id, email, full_name, avatar_url")
+          .not("full_name", "is", null)
+          .ilike("full_name", searchPattern)
+          .limit(10),
+      ])
+
+      // Procesar resultados
+      const emailUsers = emailResponse.data || []
+      const nameUsers = nameResponse.data || []
+
+      // Combinar y deduplicar
+      const allUsers = [...emailUsers, ...nameUsers]
+      const uniqueUsers = allUsers.filter(
+        (user, index, self) => index === self.findIndex((u) => u.id === user.id)
+      )
+
+      setUsers(uniqueUsers.slice(0, 10))
+    } catch (error) {
+      console.error("Error en búsqueda:", error)
+      setUsers([])
+    } finally {
+      setIsLoadingUsers(false)
     }
-    setIsLoadingUsers(false)
-  }
+  }, [supabase])
 
-  const loadUserEvents = async (userId: string) => {
+  // useEffect para manejar la búsqueda con debounce
+  useEffect(() => {
+    if (!open) {
+      setUsers([])
+      setIsLoadingUsers(false)
+      return
+    }
+
+    // Limpiar resultados si la búsqueda es muy corta
+    if (searchQuery.trim().length < 3) {
+      setUsers([])
+      setIsLoadingUsers(false)
+      return
+    }
+
+    // Debounce: esperar 500ms después de que el usuario deje de escribir
+    const timeoutId = setTimeout(() => {
+      performSearch(searchQuery).catch((err) => {
+        console.error("Error al ejecutar performSearch:", err)
+      })
+    }, 500)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [searchQuery, open, performSearch])
+
+  // Memoizar loadUserEvents para evitar recrearlo en cada render
+  const loadUserEvents = useCallback(async (userId: string) => {
     setIsLoadingEvents(true)
-    const { data, error } = await supabase
-      .from("event_registrations")
-      .select(`
-        id,
-        attended_at,
-        is_collaborator,
-        events!inner(
-          id,
-          title,
-          event_date,
-          location
-        )
-      `)
-      .eq("user_id", userId)
-      .eq("is_attended", true)
-      .order("attended_at", { ascending: false })
+    try {
+      // Primero obtener las registraciones del usuario
+      const { data: registrations, error: regError } = await supabase
+        .from("event_registrations")
+        .select("id, event_id, attended_at, is_collaborator")
+        .eq("user_id", userId)
+        .eq("is_attended", true)
+        .order("attended_at", { ascending: false })
 
-    if (!error && data) {
-      const formattedEvents = data.map((reg: any) => ({
-        id: reg.id,
-        event_title: reg.events.title,
-        event_date: reg.events.event_date,
-        location: reg.events.location,
-        attended_at: reg.attended_at,
-        is_collaborator: reg.is_collaborator,
-      }))
+      if (regError) {
+        console.error("Error loading user registrations:", regError)
+        setEvents([])
+        return
+      }
+
+      if (!registrations || registrations.length === 0) {
+        setEvents([])
+        return
+      }
+
+      // Obtener los eventos correspondientes
+      const eventIds = registrations.map(r => r.event_id)
+      const { data: eventsData, error: eventsError } = await supabase
+        .from("events")
+        .select("id, title, event_date, location")
+        .in("id", eventIds)
+
+      if (eventsError) {
+        console.error("Error loading events:", eventsError)
+        setEvents([])
+        return
+      }
+
+      // Combinar los datos
+      const formattedEvents = registrations.map((reg) => {
+        const eventData = eventsData?.find(e => e.id === reg.event_id)
+        return {
+          id: reg.id,
+          event_title: eventData?.title || 'Unknown Event',
+          event_date: eventData?.event_date || new Date().toISOString(),
+          location: eventData?.location || 'Unknown Location',
+          attended_at: reg.attended_at,
+          is_collaborator: reg.is_collaborator,
+        }
+      })
+
       setEvents(formattedEvents)
+    } catch (err) {
+      console.error("Error loading user events:", err)
+      setEvents([])
+    } finally {
+      setIsLoadingEvents(false)
     }
-    setIsLoadingEvents(false)
-  }
+  }, [supabase])
 
   const handleSelectUser = (user: UserProfile) => {
     setSelectedUser(user)
@@ -128,8 +208,19 @@ export function UserSearch() {
     })
   }
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen)
+    if (!isOpen) {
+      // Reset state when modal closes
+      setSearchQuery("")
+      setUsers([])
+      setSelectedUser(null)
+      setEvents([])
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2">
           <Search className="w-4 h-4" />

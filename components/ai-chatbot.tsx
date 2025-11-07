@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MessageCircle, X, Send, Loader2, ExternalLink } from "lucide-react"
@@ -20,21 +20,29 @@ interface EventLink {
 
 export function AIChatbot() {
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [hasGreeted, setHasGreeted] = useState(false)
   const [eventLinks, setEventLinks] = useState<EventLink[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { user } = useAuthStore()
-  const supabase = createClient()
+  // Usar selector para evitar re-renders innecesarios
+  const user = useAuthStore((state) => state.user)
+  // Memoizar el cliente de Supabase para evitar recrearlo en cada render
+  const supabase = useMemo(() => createClient(), [])
 
-  const scrollToBottom = () => {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Memoizar scrollToBottom para evitar recrearlo en cada render
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  }, [])
 
-  // Function to render message with event links
-  const renderMessageWithLinks = (content: string, messageIndex: number) => {
+  // Memoizar renderMessageWithLinks para evitar recrearlo en cada render
+  const renderMessageWithLinks = useCallback((content: string, messageIndex: number) => {
     // Match pattern: [EventTitle](eventId)
     const linkPattern = /\[([^\]]+)\]\(([a-f0-9-]{36})\)/g
     const parts: React.ReactNode[] = []
@@ -51,17 +59,32 @@ export function AIChatbot() {
       // Add the link
       const title = match[1]
       const eventId = match[2]
-      parts.push(
-        <Link
-          key={`msg-${messageIndex}-link-${linkIndex}`}
-          href={`/events/${eventId}`}
-          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-semibold"
-          onClick={() => setIsOpen(false)}
-        >
-          {title}
-          <ExternalLink className="h-3 w-3" />
-        </Link>
-      )
+      // Usar Link solo si está montado, sino usar <a> normal
+      if (mounted) {
+        parts.push(
+          <Link
+            key={`msg-${messageIndex}-link-${linkIndex}`}
+            href={`/events/${eventId}`}
+            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-semibold"
+            onClick={() => setIsOpen(false)}
+          >
+            {title}
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        )
+      } else {
+        parts.push(
+          <a
+            key={`msg-${messageIndex}-link-${linkIndex}`}
+            href={`/es/events/${eventId}`}
+            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-semibold"
+            onClick={() => setIsOpen(false)}
+          >
+            {title}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )
+      }
 
       lastIndex = match.index + match[0].length
       linkIndex++
@@ -73,11 +96,11 @@ export function AIChatbot() {
     }
 
     return parts.length > 0 ? <>{parts}</> : content
-  }
+  }, [mounted])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, scrollToBottom])
 
   useEffect(() => {
     if (isOpen && !hasGreeted && user) {

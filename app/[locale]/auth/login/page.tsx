@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
-import { Link, useRouter } from "@/lib/i18n/routing"
+import { Link } from "@/lib/i18n/routing"
 import { useTranslations } from "next-intl"
 import { useAuthStore } from "@/lib/store/auth-store"
 
@@ -17,9 +17,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
   const t = useTranslations('auth.login')
-  const { login } = useAuthStore()
+  // Usar selector para evitar re-renders innecesarios
+  const login = useAuthStore((state) => state.login)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,32 +28,59 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      if (error) throw error
+      if (signInError) {
+        throw signInError
+      }
       
       if (data.user) {
         // Fetch user profile
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", data.user.id)
-          .single()
+          .maybeSingle()
+
+        if (profileError) {
+          console.error("Error fetching profile:", profileError)
+        }
 
         if (profile) {
           // Update Zustand store
           login(data.user, profile)
+        } else {
+          // Si no hay perfil, aún así establecer el usuario
+          login(data.user, {
+            id: data.user.id,
+            email: data.user.email || '',
+            full_name: null,
+            role: 'student',
+            avatar_url: null,
+            bio: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
         }
+
+        // Redirigir según el rol del usuario
+        const redirectPath = profile?.role === 'admin' || profile?.role === 'instructor' 
+          ? '/instructor' 
+          : '/dashboard'
+        
+        // Usar window.location para una redirección completa que actualice todo
+        const currentPath = window.location.pathname
+        const localeMatch = currentPath.match(/^\/([a-z]{2})\//)
+        const locale = localeMatch ? localeMatch[1] : 'es'
+        
+        window.location.href = `/${locale}${redirectPath}`
       }
-      
-      router.push("/dashboard")
-      router.refresh()
     } catch (error: unknown) {
+      console.error("Error en login:", error)
       setError(error instanceof Error ? error.message : t('error'))
-    } finally {
       setIsLoading(false)
     }
   }

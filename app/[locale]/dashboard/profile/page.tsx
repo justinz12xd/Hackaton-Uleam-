@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Link, redirect } from "@/lib/i18n/routing"
 import { useRouter } from "@/lib/i18n/routing"
 import { useTranslations } from "next-intl"
@@ -187,8 +188,49 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">{t('loading')}</p>
+      <div className="container mx-auto py-8 px-4 max-w-4xl">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <Skeleton className="h-8 w-48" />
+            </CardTitle>
+            <CardDescription>
+              <Skeleton className="h-4 w-64" />
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Avatar skeleton */}
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-24 w-24 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+            </div>
+            
+            {/* Form fields skeleton */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            </div>
+            
+            {/* Button skeleton */}
+            <div className="flex gap-4">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }

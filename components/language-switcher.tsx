@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from 'react';
 import { useLocale } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
@@ -19,9 +20,17 @@ const languages = [
 ];
 
 export function LanguageSwitcher() {
-  const locale = useLocale();
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  
+  // useLocale debe estar dentro del NextIntlClientProvider
+  // Si no está disponible, Next.js renderizará en el cliente
+  const locale = useLocale();
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const currentLanguage = languages.find((lang) => lang.code === locale);
 
