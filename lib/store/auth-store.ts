@@ -52,12 +52,19 @@ export const useAuthStore = create<AuthState>()(
         isLoading: false,
       }),
 
-      logout: () => set({
-        user: null,
-        profile: null,
-        isAuthenticated: false,
-        isLoading: false,
-      }),
+      logout: () => {
+        // Limpiar estado
+        set({
+          user: null,
+          profile: null,
+          isAuthenticated: false,
+          isLoading: false,
+        })
+        // Limpiar localStorage explícitamente
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth-storage')
+        }
+      },
 
       updateProfile: (updates) => set((state) => ({
         profile: state.profile ? { ...state.profile, ...updates } : null,

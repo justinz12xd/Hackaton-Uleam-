@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+export async function updateSession(request: NextRequest, intlResponse?: NextResponse) {
+  // Usar la respuesta del intlMiddleware si está disponible, o crear una nueva
+  let supabaseResponse = intlResponse || NextResponse.next({
     request,
   })
 
@@ -16,29 +17,42 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+          // Actualizar la respuesta existente en lugar de crear una nueva
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options)
           })
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
         },
       },
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Solo verificar usuario en rutas protegidas
+  const pathname = request.nextUrl.pathname
+  const isProtectedRoute = 
+    pathname.includes('/dashboard') || 
+    pathname.includes('/admin') || 
+    pathname.includes('/instructor')
 
-  // Redirect unauthenticated users to login, except for public pages
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith("/") &&
-    !request.nextUrl.pathname.startsWith("/auth") &&
-    !request.nextUrl.pathname.startsWith("/courses")
-  ) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/auth/login"
-    return NextResponse.redirect(url)
+  if (isProtectedRoute) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      // Redirect unauthenticated users to login
+      if (!user) {
+        const url = request.nextUrl.clone()
+        // Extraer locale de la ruta si existe
+        const localeMatch = pathname.match(/^\/([a-z]{2})\//)
+        const locale = localeMatch ? localeMatch[1] : 'es'
+        url.pathname = `/${locale}/auth/login`
+        return NextResponse.redirect(url)
+      }
+    } catch (error) {
+      // Si hay error obteniendo el usuario, permitir continuar
+      // La página individual manejará la autenticación
+      console.error("Error en middleware auth:", error)
+    }
   }
 
   return supabaseResponse

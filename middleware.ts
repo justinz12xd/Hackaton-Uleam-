@@ -6,12 +6,47 @@ import { routing } from './lib/i18n/routing';
 // Create the i18n middleware
 const intlMiddleware = createMiddleware(routing);
 
+// Rutas públicas que no requieren autenticación
+const publicRoutes = [
+  '/',
+  '/auth',
+  '/courses',
+  '/events',
+  '/api',
+]
+
+// Rutas que requieren autenticación
+const protectedRoutes = [
+  '/dashboard',
+  '/admin',
+  '/instructor',
+]
+
 export async function middleware(request: NextRequest) {
-  // First handle i18n
+  const pathname = request.nextUrl.pathname
+  
+  // Primero manejar i18n
   const response = intlMiddleware(request);
   
-  // Then update the session
-  return await updateSession(request);
+  // Extraer la ruta sin el locale (ej: /es/dashboard -> /dashboard)
+  const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
+  
+  // Verificar si es una ruta protegida (considerando locale)
+  const isProtectedRoute = 
+    pathname.includes('/dashboard') || 
+    pathname.includes('/admin') || 
+    pathname.includes('/instructor') ||
+    protectedRoutes.some(route => pathWithoutLocale.startsWith(route))
+  
+  // Solo verificar autenticación en rutas protegidas
+  // Para rutas públicas, solo actualizamos cookies de sesión sin verificar usuario
+  if (isProtectedRoute) {
+    return await updateSession(request, response)
+  }
+  
+  // Para rutas públicas, solo retornamos la respuesta del i18n
+  // Esto es más rápido y no bloquea la carga con llamadas a Supabase
+  return response
 }
 
 export const config = {

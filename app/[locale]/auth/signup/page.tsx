@@ -21,7 +21,8 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const t = useTranslations('auth.signup')
-  const { login } = useAuthStore()
+  // Usar selector para evitar re-renders innecesarios
+  const login = useAuthStore((state) => state.login)
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()

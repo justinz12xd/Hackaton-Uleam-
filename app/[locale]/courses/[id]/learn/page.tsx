@@ -38,16 +38,18 @@ export default async function LearnPage({ params }: LearnPageProps) {
   const currentUser = user!
   const currentCourse = course
 
-  const { data: profileRow } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", currentUser.id)
-    .maybeSingle()
-
-  const userRole = profileRow?.role ?? null
-  const studentFullName = profileRow?.full_name || currentUser.email || "Estudiante"
-
   const isInstructor = currentUser.id === currentCourse.instructor_id
+
+  let userRole: string | null = null
+  if (!isInstructor) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+  .eq("id", currentUser.id)
+      .maybeSingle()
+
+    userRole = profile?.role ?? null
+  }
 
   const isAdmin = userRole === "admin"
 
@@ -81,15 +83,17 @@ export default async function LearnPage({ params }: LearnPageProps) {
     hasEventAccess = (verifiedRegistrations?.length ?? 0) > 0
   }
 
-  const { data: existingEnrollment } = await supabase
-    .from("course_enrollments")
-    .select("id")
-    .eq("course_id", id)
-    .eq("student_id", currentUser.id)
-    .maybeSingle()
+  let hasEnrollmentAccess = false
+  if (eventIds.length === 0) {
+    const { data: enrollment } = await supabase
+      .from("course_enrollments")
+      .select("id")
+      .eq("course_id", id)
+  .eq("student_id", currentUser.id)
+      .maybeSingle()
 
-  let enrollmentId = existingEnrollment?.id || null
-  let hasEnrollmentAccess = Boolean(enrollmentId)
+    hasEnrollmentAccess = Boolean(enrollment)
+  }
 
   const hasAccess =
     isInstructor ||
@@ -98,56 +102,6 @@ export default async function LearnPage({ params }: LearnPageProps) {
 
   if (!hasAccess || (!currentCourse.is_published && !isInstructor && !isAdmin)) {
     redirect({ href: `/courses/${id}`, locale })
-  }
-
-  if (!enrollmentId) {
-    try {
-      const { data: newEnrollment } = await supabase
-        .from("course_enrollments")
-        .insert([
-          {
-            course_id: id,
-            student_id: currentUser.id,
-          },
-        ])
-        .select()
-        .single()
-
-      enrollmentId = newEnrollment?.id || null
-      hasEnrollmentAccess = Boolean(enrollmentId)
-    } catch (error) {
-      console.warn("No se pudo crear la inscripción automática", error)
-    }
-  }
-
-  let eventContext: { id: string; title: string; organizerName?: string | null } | null = null
-
-  const preferredEventId = currentCourse.primary_event_id || eventIds[0] || null
-  if (preferredEventId) {
-    const { data: event } = await supabase
-      .from("events")
-      .select("id, title, organizer_id")
-      .eq("id", preferredEventId)
-      .maybeSingle()
-
-    if (event) {
-      let organizerName: string | null = null
-      if (event.organizer_id) {
-        const { data: organizerProfile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", event.organizer_id)
-          .maybeSingle()
-
-        organizerName = organizerProfile?.full_name || null
-      }
-
-      eventContext = {
-        id: event.id,
-        title: event.title,
-        organizerName,
-      }
-    }
   }
 
   let courseContent: CourseContent | null = null
@@ -191,11 +145,6 @@ export default async function LearnPage({ params }: LearnPageProps) {
           courseTitle={safeCourse.title}
           content={courseContent}
           isEnrolled={hasAccess}
-          enrollmentId={enrollmentId}
-          studentName={studentFullName}
-          studentEmail={currentUser.email || undefined}
-          eventContext={eventContext}
-          locale={locale}
         />
       </div>
     </main>

@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { UserSearch } from "@/components/user-search"
 import { useTranslations } from "next-intl"
@@ -22,23 +21,72 @@ import { User, LogOut, Settings } from "lucide-react"
 
 export function Navbar() {
   const [mounted, setMounted] = useState(false)
-  const { user, profile, isAuthenticated, logout: storeLogout } = useAuthStore()
-  const router = useRouter()
-  const supabase = createClient()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  // Usar selectores para evitar re-renders innecesarios
+  const user = useAuthStore((state) => state.user)
+  const profile = useAuthStore((state) => state.profile)
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const storeLogout = useAuthStore((state) => state.logout)
+  
+  // Memoizar el cliente de Supabase para evitar recrearlo en cada render
+  const supabase = useMemo(() => createClient(), [])
+  
+  // useTranslations debe estar dentro del NextIntlClientProvider
+  // Si no está disponible, Next.js renderizará en el cliente
   const t = useTranslations('nav')
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
+  // Memoizar handleLogout para evitar recrearlo en cada render
+  const handleLogout = useCallback(async () => {
+    setIsLoggingOut(true)
+    
+    // Limpiar estado local primero
     storeLogout()
-    router.push("/")
-    router.refresh()
-  }
+    
+    // Obtener locale antes de redirigir
+    const currentPath = window.location.pathname
+    const localeMatch = currentPath.match(/^\/([a-z]{2})\//)
+    const locale = localeMatch ? localeMatch[1] : 'es'
+    
+    try {
+      // Cerrar sesión en Supabase y esperar a que se complete
+      // Esto asegura que las cookies se limpien correctamente
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error("Error al cerrar sesión:", error)
+        // Aún así continuar con la redirección
+      }
+    } catch (error) {
+      console.error("Error inesperado al cerrar sesión:", error)
+      // Aún así continuar con la redirección
+    }
+    
+    // Limpiar todas las cookies de Supabase manualmente por si acaso
+    if (typeof document !== 'undefined') {
+      // Limpiar cookies de Supabase
+      const cookies = document.cookie.split(';')
+      cookies.forEach(cookie => {
+        const eqPos = cookie.indexOf('=')
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
+        // Limpiar cookies relacionadas con Supabase
+        if (name.includes('supabase') || name.includes('sb-')) {
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
+        }
+      })
+    }
+    
+    // Redirigir después de limpiar todo
+    // Usar window.location.replace para evitar que el usuario pueda volver atrás
+    window.location.replace(`/${locale}`)
+  }, [supabase, storeLogout])
 
-  const getInitials = (name: string | null, email: string) => {
+  // Memoizar funciones helper para evitar recrearlas en cada render
+  const getInitials = useCallback((name: string | null, email: string) => {
     if (name) {
       const parts = name.split(' ')
       if (parts.length >= 2) {
@@ -47,27 +95,27 @@ export function Navbar() {
       return name.substring(0, 2).toUpperCase()
     }
     return email.substring(0, 2).toUpperCase()
-  }
+  }, [])
 
-  const getFirstName = (name: string | null) => {
+  const getFirstName = useCallback((name: string | null) => {
     if (name) {
       return name.split(' ')[0]
     }
     return null
-  }
+  }, [])
 
-  // Prevent hydration mismatch
+  // Prevent hydration mismatch - usar href directo en lugar de Link durante SSR
   if (!mounted) {
     return (
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Link href="/events" className="text-2xl font-bold text-primary">
+          <a href="/es/events" className="text-2xl font-bold text-primary">
             EduCred
-          </Link>
+          </a>
           <div className="flex gap-4 items-center">
-            <Link href="/events">
+            <a href="/es/events">
               <Button variant="ghost">Events</Button>
-            </Link>
+            </a>
           </div>
         </div>
       </nav>
@@ -139,9 +187,13 @@ export function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>{t('logout')}</span>
+                  <DropdownMenuItem 
+                    onClick={handleLogout} 
+                    disabled={isLoggingOut}
+                    className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950"
+                  >
+                    <LogOut className={`mr-2 h-4 w-4 ${isLoggingOut ? 'animate-spin' : ''}`} />
+                    <span>{isLoggingOut ? 'Cerrando sesión...' : t('logout')}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

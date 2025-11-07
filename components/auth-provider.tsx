@@ -1,12 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuthStore } from "@/lib/store/auth-store"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
-  const { setUser, setProfile, setLoading, logout } = useAuthStore()
+  // Usar selectores para evitar re-renders innecesarios
+  const setUser = useAuthStore((state) => state.setUser)
+  const setProfile = useAuthStore((state) => state.setProfile)
+  const setLoading = useAuthStore((state) => state.setLoading)
+  const logout = useAuthStore((state) => state.logout)
+
+  // Memoizar el cliente de Supabase para evitar recrearlo en cada render
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     setMounted(true)
@@ -15,36 +22,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return
 
-    const supabase = createClient()
-
     // Get initial session
     const initAuth = async () => {
       try {
         setLoading(true)
         
-        const { data: { user } } = await supabase.auth.getUser()
+        // Verificar si hay una sesión en Supabase
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
-        if (user) {
-          // Fetch profile
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .maybeSingle()
+        // Si no hay sesión, limpiar estado y salir
+        if (!session || sessionError) {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+        
+        // Si hay sesión, verificar el usuario
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        // Si no hay usuario o hay error, limpiar estado
+        if (!user || userError) {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+        
+        // Si hay usuario, obtener el perfil
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle()
 
-          if (profile) {
-            setUser(user)
-            setProfile(profile)
-          } else {
-            setUser(null)
-            setProfile(null)
-          }
+        if (profile) {
+          setUser(user)
+          setProfile(profile)
         } else {
           setUser(null)
           setProfile(null)
         }
       } catch (error) {
         console.error("Error initializing auth:", error)
+        // En caso de error, limpiar estado
+        setUser(null)
+        setProfile(null)
       } finally {
         setLoading(false)
       }
@@ -57,24 +80,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log("Auth state changed:", event, session?.user?.email)
 
-        if (event === "SIGNED_IN" && session?.user) {
-          // Fetch profile when user signs in
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle()
+        try {
+          if (event === "SIGNED_IN" && session?.user) {
+            setLoading(true)
+            // Fetch profile when user signs in
+            const { data: profile, error: profileError } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .maybeSingle()
 
-          if (profile) {
+            if (profileError) {
+              console.error("Error fetching profile:", profileError)
+            }
+
+            if (profile) {
+              setUser(session.user)
+              setProfile(profile)
+            } else {
+              // Si no hay perfil, aún así establecer el usuario
+              setUser(session.user)
+              setProfile(null)
+            }
+            setLoading(false)
+          } else if (event === "SIGNED_OUT") {
+            // Limpiar estado cuando se cierra sesión
+            console.log("Usuario cerró sesión, limpiando estado...")
+            logout() // logout() ya limpia todo el estado
+            setLoading(false)
+          } else if (event === "TOKEN_REFRESHED" && session?.user) {
+            // Actualizar usuario cuando se refresca el token
             setUser(session.user)
-            setProfile(profile)
+          } else if (event === "USER_UPDATED" && session?.user) {
+            // Actualizar usuario cuando se actualiza
+            setUser(session.user)
+            // También actualizar perfil si está disponible
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .maybeSingle()
+            
+            if (profile) {
+              setProfile(profile)
+            }
+          } else if (event === "USER_DELETED") {
+            // Limpiar estado si el usuario fue eliminado
+            logout()
+            setLoading(false)
           }
-        } else if (event === "SIGNED_OUT") {
-          logout()
-        } else if (event === "TOKEN_REFRESHED" && session?.user) {
-          setUser(session.user)
-        } else if (event === "USER_UPDATED" && session?.user) {
-          setUser(session.user)
+        } catch (error) {
+          console.error("Error en auth state change:", error)
+          setLoading(false)
         }
       }
     )
@@ -82,7 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [mounted, setUser, setProfile, setLoading, logout])
+    // Las funciones del store son estables, no necesitan estar en las dependencias
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted])
 
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
