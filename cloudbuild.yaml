@@ -1,0 +1,49 @@
+# Google Cloud Build Configuration
+# Configuración optimizada para deployment automático
+
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/educred:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/educred:latest'
+      - '.'
+    timeout: 1200s
+
+  # Push images
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/educred:$SHORT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/educred:latest']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'educred'
+      - '--image=gcr.io/$PROJECT_ID/educred:$SHORT_SHA'
+      - '--region=europe-west1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--max-instances=10'
+      - '--port=3000'
+
+# Store images
+images:
+  - 'gcr.io/$PROJECT_ID/educred:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/educred:latest'
+
+timeout: 1800s
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
