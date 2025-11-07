@@ -24,9 +24,10 @@ interface Event {
 interface EventsClientProps {
   initialEvents: Event[]
   user: any
+  userProfile: any
 }
 
-export function EventsClient({ initialEvents, user }: EventsClientProps) {
+export function EventsClient({ initialEvents, user, userProfile }: EventsClientProps) {
   const t = useTranslations('events')
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

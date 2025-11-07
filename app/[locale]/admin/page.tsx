@@ -182,6 +182,24 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
+        {/* Certificates Management */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              Certificates Management
+            </CardTitle>
+            <CardDescription>View and manage users with certificates</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/certificates">
+              <Button variant="outline" className="w-full bg-transparent">
+                View Users with Certificates
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         {/* Quick Actions */}
         <Card className="mt-8">
           <CardHeader>

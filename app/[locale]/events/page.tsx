@@ -12,6 +12,17 @@ export default async function EventsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Fetch user profile to check role
+  let userProfile = null
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+    userProfile = profile
+  }
+
   // Fetch events and registrations in parallel with optimized queries
   const [eventsResponse, registrationsResponse] = await Promise.all([
     supabase
@@ -74,9 +85,24 @@ export default async function EventsPage() {
                   staticText="Eventos"
                 />
               </h1>
-              
+              <p className="text-muted-foreground text-lg">
+                {userProfile?.role === 'instructor' || userProfile?.role === 'admin'
+                  ? 'Crea y gestiona eventos para tu comunidad'
+                  : 'Descubre y participa en eventos relevantes para tu aprendizaje'}
+              </p>
             </div>
 
+            {/* Create Event Button - Only for instructors and admins */}
+            {(userProfile?.role === 'instructor' || userProfile?.role === 'admin') && (
+              <div className="shrink-0">
+                <Link href="/events/create">
+                  <Button size="lg" className="gap-2">
+                    <Plus className="h-5 w-5" />
+                    {t('createEvent')}
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -85,7 +111,7 @@ export default async function EventsPage() {
       <EventsCarousel events={eventsWithData} />
 
       {/* Client component for events list */}
-      <EventsClient initialEvents={eventsWithData} user={user} />
+      <EventsClient initialEvents={eventsWithData} user={user} userProfile={userProfile} />
     </main>
   )
 }

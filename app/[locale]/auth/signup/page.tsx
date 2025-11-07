@@ -11,12 +11,21 @@ import { useState } from "react"
 import { Link, useRouter } from "@/lib/i18n/routing"
 import { useTranslations } from "next-intl"
 import { useAuthStore } from "@/lib/store/auth-store"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { GraduationCap, BookOpen } from "lucide-react"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [repeatPassword, setRepeatPassword] = useState("")
   const [fullName, setFullName] = useState("")
+  const [role, setRole] = useState<"student" | "instructor">("student")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -51,7 +60,23 @@ export default function SignupPage() {
       
       // Auto-login after signup if email confirmation is disabled
       if (data.user && data.session) {
-        // Fetch user profile (created by trigger)
+        // Wait for profile to be created by trigger
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Update profile with selected role
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ 
+            role,
+            full_name: fullName 
+          })
+          .eq("id", data.user.id)
+
+        if (updateError) {
+          console.error("Error updating profile role:", updateError)
+        }
+
+        // Fetch updated profile
         const { data: profile } = await supabase
           .from("profiles")
           .select("*")
@@ -105,6 +130,31 @@ export default function SignupPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="role">{t('role')}</Label>
+                    <Select value={role} onValueChange={(value: "student" | "instructor") => setRole(value)}>
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder={t('selectRole')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="student">
+                          <div className="flex items-center gap-2">
+                            <GraduationCap className="h-4 w-4" />
+                            <span>{t('studentRole')}</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="instructor">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4" />
+                            <span>{t('instructorRole')}</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {role === "student" ? t('studentDescription') : t('instructorDescription')}
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="password">{t('password')}</Label>

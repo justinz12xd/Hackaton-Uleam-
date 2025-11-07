@@ -61,12 +61,13 @@ export async function POST(request: NextRequest) {
     // Check if microcredential already exists
     const existingCredential = await supabase
       .from("microcredentials")
-      .select("*")
+      .select("*, certificates(*)")
       .eq("course_id", courseId)
       .eq("student_id", currentUser.id)
       .single()
 
     let credentialId
+    let certificateData
 
     const metadata = {
       eventId: eventContext?.id || null,
@@ -79,8 +80,37 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingCredential.data) {
-      // Update existing credential
+      // Credential already exists - return existing certificate
       credentialId = existingCredential.data.id
+      
+      // Check if certificate already exists
+      const existingCertificates = (existingCredential.data as any).certificates
+      if (existingCertificates && existingCertificates.length > 0) {
+        // Certificate already exists - return it instead of creating a new one
+        certificateData = existingCertificates[0]
+        
+        console.log("[certificates/generate] Certificate already exists:", {
+          certificateNumber: certificateData.certificate_number,
+          credentialId,
+          courseId,
+          studentId: currentUser.id,
+        })
+
+        return NextResponse.json({
+          success: true,
+          certificateNumber: certificateData.certificate_number,
+          credentialId,
+          verificationUrl: createAbsoluteUrl(`/certificates/${certificateData.certificate_number}`, request),
+          qrCodeDataUrl: await QRCode.toDataURL(
+            createAbsoluteUrl(`/certificates/${certificateData.certificate_number}`, request),
+            { margin: 1 }
+          ),
+          issuedAt: certificateData.issue_date,
+          message: "Certificate already exists for this course",
+        })
+      }
+
+      // Update existing credential but no certificate yet
       await supabase
         .from("microcredentials")
         .update({
@@ -112,10 +142,10 @@ export async function POST(request: NextRequest) {
       credentialId = credentialResponse.data?.id
     }
 
-    // Create or update certificate
+    // Create new certificate (only if it doesn't exist already)
     const certificateResponse = await supabase
       .from("certificates")
-      .upsert([
+      .insert([
         {
           credential_id: credentialId,
           certificate_number: certificateNumber,

@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Link, redirect } from "@/lib/i18n/routing"
 import { useRouter } from "@/lib/i18n/routing"
 import { useTranslations } from "next-intl"
-import { Camera, Loader2 } from "lucide-react"
+import { Camera, Loader2, Award, Download, Share2, Calendar } from "lucide-react"
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<{ full_name: string; bio: string; role: string; avatar_url?: string } | null>(null)
@@ -22,6 +22,8 @@ export default function ProfilePage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [certificates, setCertificates] = useState<any[]>([])
+  const [isLoadingCertificates, setIsLoadingCertificates] = useState(true)
   const [formData, setFormData] = useState({
     full_name: "",
     bio: "",
@@ -62,12 +64,27 @@ export default function ProfilePage() {
             bio: profileData?.bio || "",
           })
         }
+
+        // Fetch user certificates
+        const { data: certificatesData, error: certificatesError } = await supabase
+          .from("microcredentials")
+          .select("*, course:courses(*), certificate:certificates(*)")
+          .eq("student_id", userData.user.id)
+          .eq("status", "completed")
+          .order("issue_date", { ascending: false })
+
+        if (certificatesError) {
+          console.error("Error fetching certificates:", certificatesError)
+        } else {
+          setCertificates(certificatesData || [])
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Error al cargar el perfil"
         setError(errorMessage)
         console.error("Error fetching profile:", err)
       } finally {
         setIsLoading(false)
+        setIsLoadingCertificates(false)
       }
     }
 
@@ -351,7 +368,111 @@ export default function ProfilePage() {
             <CardDescription>{t('downloadShare')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground text-sm">{t('completeCourses')}</p>
+            {isLoadingCertificates ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : certificates.length > 0 ? (
+              <div className="space-y-4">
+                {certificates.map((credential) => {
+                  const course = credential.course as any
+                  const certificate = Array.isArray(credential.certificate) 
+                    ? credential.certificate[0] 
+                    : credential.certificate as any
+                  
+                  const issueDate = credential.issue_date 
+                    ? new Date(credential.issue_date).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })
+                    : null
+
+                  const certificateNumber = certificate?.certificate_number || null
+
+                  return (
+                    <div
+                      key={credential.id}
+                      className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-shrink-0">
+                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Award className="h-6 w-6 text-primary" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm md:text-base line-clamp-1">
+                          {course?.title || 'Curso completado'}
+                        </h3>
+                        {issueDate && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>Emitido el {issueDate}</span>
+                          </div>
+                        )}
+                        {certificateNumber && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Certificado #{certificateNumber}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0 flex gap-2">
+                        {certificateNumber && (
+                          <>
+                            <Link href={`/certificates/${certificateNumber}`} target="_blank">
+                              <Button variant="outline" size="sm" className="gap-2">
+                                <Download className="h-4 w-4" />
+                                <span className="hidden sm:inline">Ver</span>
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => {
+                                if (navigator.share) {
+                                  navigator.share({
+                                    title: `Certificado: ${course?.title || 'Curso'}`,
+                                    text: `He completado el curso: ${course?.title || 'Curso'}`,
+                                    url: `${window.location.origin}/certificates/${certificateNumber}`
+                                  })
+                                } else {
+                                  navigator.clipboard.writeText(
+                                    `${window.location.origin}/certificates/${certificateNumber}`
+                                  )
+                                  alert('Enlace copiado al portapapeles')
+                                }
+                              }}
+                            >
+                              <Share2 className="h-4 w-4" />
+                              <span className="hidden sm:inline">Compartir</span>
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Award className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
+                <p className="text-muted-foreground text-sm">{t('completeCourses')}</p>
+                <Link href="/courses">
+                  <Button variant="outline" className="mt-4">
+                    Explorar Cursos
+                  </Button>
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

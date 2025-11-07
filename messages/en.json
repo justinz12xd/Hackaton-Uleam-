@@ -10,7 +10,8 @@
     "signup": "Sign up",
     "profile": "Profile",
     "settings": "Settings",
-    "user": "User"
+    "user": "User",
+    "admin": "Admin"
   },
   "home": {
     "hero": {
@@ -96,20 +97,26 @@
     "signUp": "Sign up",
     "error": "An error occurred"
   },
-  "signup": {
-    "title": "Sign up",
-    "description": "Create a new account to get started",
-    "fullName": "Full Name",
-    "email": "Email",
-    "password": "Password",
-    "repeatPassword": "Repeat Password",
-    "submit": "Sign up",
-    "creating": "Creating account...",
-    "hasAccount": "Already have an account?",
-    "login": "Login",
-    "passwordMismatch": "Passwords do not match",
-    "error": "An error occurred"
-  },
+    "signup": {
+      "title": "Sign up",
+      "description": "Create a new account to get started",
+      "fullName": "Full Name",
+      "email": "Email",
+      "role": "Account Type",
+      "selectRole": "Select your role",
+      "studentRole": "Student",
+      "instructorRole": "Instructor",
+      "studentDescription": "Access courses, events, and earn certificates",
+      "instructorDescription": "Create and manage courses, events, and evaluate students",
+      "password": "Password",
+      "repeatPassword": "Repeat Password",
+      "submit": "Sign up",
+      "creating": "Creating account...",
+      "hasAccount": "Already have an account?",
+      "login": "Login",
+      "passwordMismatch": "Passwords do not match",
+      "error": "An error occurred"
+    },
   "signupSuccess": {
     "title": "Thank you for signing up!",
     "description": "Your account has been created",
