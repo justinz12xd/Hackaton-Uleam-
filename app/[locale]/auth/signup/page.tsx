@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { Link, useRouter } from "@/lib/i18n/routing"
 import { useTranslations } from "next-intl"
+import { useAuthStore } from "@/lib/store/auth-store"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
@@ -20,6 +21,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const t = useTranslations('auth.signup')
+  const { login } = useAuthStore()
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,7 +36,7 @@ export default function SignupPage() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -43,8 +45,25 @@ export default function SignupPage() {
           },
         },
       })
+      
       if (error) throw error
+      
+      // Auto-login after signup if email confirmation is disabled
+      if (data.user && data.session) {
+        // Fetch user profile (created by trigger)
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .single()
+
+        if (profile) {
+          login(data.user, profile)
+        }
+      }
+      
       router.push("/auth/signup-success")
+      router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : t('error'))
     } finally {

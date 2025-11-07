@@ -203,12 +203,25 @@ export default function EventDetailPage() {
     // Fetch collaborators
     const { data: collabData } = await supabase
       .from("event_registrations")
-      .select("id, user_id, profiles:user_id(full_name, email)")
+      .select("id, user_id, is_collaborator")
       .eq("event_id", params.id)
       .eq("is_collaborator", true)
 
-    if (collabData) {
-      setCollaborators(collabData as any)
+    if (collabData && collabData.length > 0) {
+      // Get profiles for collaborators
+      const userIds = collabData.map((c: any) => c.user_id)
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", userIds)
+      
+      // Merge collaborators with profiles
+      const mergedCollabs = collabData.map((collab: any) => ({
+        ...collab,
+        profiles: profilesData?.find((p: any) => p.id === collab.user_id)
+      }))
+      
+      setCollaborators(mergedCollabs as any)
     }
 
     // Check if user is registered
@@ -482,14 +495,22 @@ export default function EventDetailPage() {
       return
     }
 
+    console.log("Registration found:", {
+      id: regData.id,
+      user_id: regData.user_id,
+      event_id: regData.event_id,
+      is_attended: regData.is_attended,
+      attended_at: regData.attended_at
+    })
+
     // Check if already attended
     if (regData.is_attended) {
-      console.log("⚠️ User already marked as attended")
-      setScanError("Este usuario ya marcó asistencia")
+      console.log("⚠️ User already marked as attended at:", regData.attended_at)
+      setScanError(`Este usuario ya marcó asistencia el ${new Date(regData.attended_at).toLocaleString()}`)
       return
     }
 
-    console.log("📝 Marking attendance...")
+    console.log("📝 Marking attendance for registration ID:", regData.id)
 
     // Mark attendance
     const { data: updateData, error: updateError } = await supabase

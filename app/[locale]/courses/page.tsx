@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Search } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
+import { SkeletonCard } from "@/components/ui/skeleton"
 
 interface Course {
   id: string
@@ -222,11 +223,12 @@ export default function CoursesPage() {
               </div>
             </div>
           </div>
-
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             {isLoading ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">Loading courses...</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

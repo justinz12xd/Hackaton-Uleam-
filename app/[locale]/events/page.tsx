@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Calendar, MapPin, Users, Clock, Plus } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
 import { useRouter } from "next/navigation"
+import { SkeletonEventCard } from "@/components/ui/skeleton"
 
 interface Event {
   id: string
@@ -61,29 +62,40 @@ export default function EventsPage() {
     // For each event, get registration count and check if user is registered
     const eventsWithData = await Promise.all(
       (eventsData || []).map(async (event) => {
-        // Get registration count
-        const { count } = await supabase
-          .from("event_registrations")
-          .select("*", { count: "exact", head: true })
-          .eq("event_id", event.id)
-
-        // Check if current user is registered
-        let isRegistered = false
-        if (user) {
-          const { data: registration } = await supabase
+        try {
+          // Get registration count
+          const { count } = await supabase
             .from("event_registrations")
-            .select("id")
+            .select("*", { count: "exact", head: true })
             .eq("event_id", event.id)
-            .eq("user_id", user.id)
-            .single()
 
-          isRegistered = !!registration
-        }
+          // Check if current user is registered
+          let isRegistered = false
+          if (user) {
+            const { data: registration, error: regError } = await supabase
+              .from("event_registrations")
+              .select("id")
+              .eq("event_id", event.id)
+              .eq("user_id", user.id)
+              .maybeSingle()
 
-        return {
-          ...event,
-          registrations_count: count || 0,
-          is_registered: isRegistered,
+            if (!regError && registration) {
+              isRegistered = true
+            }
+          }
+
+          return {
+            ...event,
+            registrations_count: count || 0,
+            is_registered: isRegistered,
+          }
+        } catch (error) {
+          console.error(`Error processing event ${event.id}:`, error)
+          return {
+            ...event,
+            registrations_count: 0,
+            is_registered: false,
+          }
         }
       })
     )
@@ -157,11 +169,6 @@ export default function EventsPage() {
             </div>
             {user && (
               <div className="flex gap-3">
-                <Link href="/events/check-in">
-                  <Button variant="outline">
-                    Check-in QR
-                  </Button>
-                </Link>
                 <Link href="/events/create">
                   <Button>
                     Crear evento
@@ -176,8 +183,10 @@ export default function EventsPage() {
       {/* Events List */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading events...</p>
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonEventCard key={i} />
+            ))}
           </div>
         ) : events.length > 0 ? (
           <div className="space-y-8">
