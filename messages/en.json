@@ -39,13 +39,22 @@
         "description": "Connect with learners and instructors in a supportive, collaborative environment."
       }
     },
-    "courses": {
-      "title": "Popular Courses",
-      "subtitle": "Start learning today from our most popular microcredential programs",
+    "coursesSection": {
+      "title": "Courses",
+      "subtitle": "Start learning today with courses provided by your events",
       "levels": {
         "beginner": "Beginner",
         "intermediate": "Intermediate",
         "advanced": "Advanced"
+      },
+      "eventos": {
+        "title": "Events",
+        "subtitle": "Discover and participate in relevant events for your learning",
+        "levels": {
+          "beginner": "Beginner",
+          "intermediate": "Intermediate",
+          "advanced": "Advanced"
+        }
       },
       "hours": "hours",
       "courseTitle": "Course Title",
@@ -54,6 +63,9 @@
       "explore": "Explore Course",
       "viewAll": "View All Courses",
       "noCourses": "No courses available yet"
+    },
+    "courses": {
+      "title": "Courses"
     },
     "cta": {
       "title": "Ready to advance your career?",

@@ -73,7 +73,19 @@
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
 }
-
+.page-content h1,
+.page-content h2,
+.page-content h3,
+.page-content h4,
+.page-content h5,
+.page-content h6,
+.page-content p,
+.page-content li,
+.page-content span,
+.page-content label,
+.page-content button {
+  animation: slideUpText 0.6s ease-out;
+}
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
@@ -122,4 +134,5 @@
   body {
     @apply bg-background text-foreground;
   }
+
 }
