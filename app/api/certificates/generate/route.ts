@@ -49,6 +49,13 @@ export async function POST(request: NextRequest) {
     const certificateNumber = `EDUC-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
     const verificationUrl = createAbsoluteUrl(`/certificates/${certificateNumber}`, request)
+    console.log("[certificates/generate]", {
+      certificateNumber,
+      verificationUrl,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+      siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+      vercelUrl: process.env.VERCEL_URL,
+    })
     const qrCodeDataUrl = await QRCode.toDataURL(verificationUrl, { margin: 1 })
 
     // Check if microcredential already exists
