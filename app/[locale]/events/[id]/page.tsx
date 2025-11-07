@@ -391,76 +391,75 @@ export default function EventDetailPage() {
   }
 
   const onScanSuccess = async (decodedText: string) => {
+    console.log("=== QR SCAN STARTED ===")
     console.log("QR Code scanned:", decodedText)
     
     // Stop scanner immediately
     await stopScanner()
 
-    // Parse QR code format: EVENT-{eventId}-USER-{userId}-{timestamp}
-    const qrParts = decodedText.split("-")
-    
-    if (qrParts.length < 4 || qrParts[0] !== "EVENT") {
-      setScanError("Código QR inválido")
-      return
-    }
+    console.log("✅ QR validation passed, searching registration by QR code...")
 
-    const scannedEventId = qrParts[1]
-    
-    // Verify QR is for this event
-    if (scannedEventId !== event?.id) {
-      setScanError("Este QR no corresponde a este evento")
-      return
-    }
-
-    // Find registration by QR code
+    // Find registration by exact QR code match (more reliable)
     const { data: regData, error: regError } = await supabase
       .from("event_registrations")
       .select("*")
       .eq("qr_code", decodedText)
-      .eq("event_id", event.id)
-      .single()
+      .eq("event_id", event?.id)
+      .maybeSingle()
 
-    if (regError || !regData) {
-      setScanError("Registro no encontrado")
+    console.log("Registration data:", regData)
+    console.log("Registration error:", regError)
+
+    if (regError) {
+      console.error("❌ Error fetching registration:", regError)
+      setScanError("Error al buscar registro: " + regError.message)
+      return
+    }
+
+    if (!regData) {
+      console.log("❌ Registration not found for this QR and event")
+      setScanError("Registro no encontrado para este evento. Verifica que el QR sea correcto.")
       return
     }
 
     // Check if already attended
     if (regData.is_attended) {
+      console.log("⚠️ User already marked as attended")
       setScanError("Este usuario ya marcó asistencia")
       return
     }
 
+    console.log("📝 Marking attendance...")
+
     // Mark attendance
-    const { error: updateError } = await supabase
+    const { data: updateData, error: updateError } = await supabase
       .from("event_registrations")
       .update({
         is_attended: true,
         attended_at: new Date().toISOString(),
       })
       .eq("id", regData.id)
+      .select()
+
+    console.log("Update result:", updateData)
+    console.log("Update error:", updateError)
 
     if (updateError) {
-      console.error("Error updating attendance:", updateError)
-      setScanError("Error al marcar asistencia")
+      console.error("❌ Error updating attendance:", updateError)
+      setScanError("Error al marcar asistencia: " + updateError.message)
       return
     }
 
-    console.log("Attendance marked successfully for user:", regData.user_id)
-    setScanSuccess("¡Asistencia registrada exitosamente!")
+    console.log("✅ Attendance marked successfully for user:", regData.user_id)
+    setScanSuccess(`¡Asistencia registrada exitosamente!`)
     
-    // Refresh event data to update counts and collaborators
+    // Refresh attendees list immediately
+    await fetchAttendees()
+    
+    // Refresh event data
     await fetchEvent()
     
-    // If the user being scanned is viewing this page, update their registration state
-    if (user?.id === regData.user_id) {
-      console.log("Updating current user's registration state")
-      setRegistration({
-        ...regData,
-        is_attended: true,
-        attended_at: new Date().toISOString(),
-      })
-    }
+    console.log("=== QR SCAN COMPLETED ===")
   }
 
   const onScanError = (errorMessage: string) => {
