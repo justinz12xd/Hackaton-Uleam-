@@ -20,46 +20,39 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     redirect({ href: "/auth/login", locale })
   }
 
-  // Fetch user profile and attended events
-  const [profileResponse, registrationsResponse] = await Promise.all([
+  // Optimize: Fetch all data in parallel with joins
+  const [profileResponse, registrationsResponse, upcomingEventsResponse] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", data.user.id).single(),
     supabase
       .from("event_registrations")
-      .select("*")
+      .select("*, event:events(*)")
       .eq("user_id", data.user.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("events")
+      .select("*")
+      .gte("event_date", new Date().toISOString())
+      .order("event_date", { ascending: true })
+      .limit(6),
   ])
 
   const profile = profileResponse.data
   const registrationsData = registrationsResponse.data || []
+  const allUpcomingEvents = upcomingEventsResponse.data || []
 
-  // Get event details for each registration
-  const eventIds = registrationsData.map((r: any) => r.event_id).filter(Boolean)
-  const { data: eventsData } = await supabase
-    .from("events")
-    .select("*")
-    .in("id", eventIds)
-
-  // Merge registrations with events
+  // Process registrations (events are already joined)
   const registrations = registrationsData.map((reg: any) => ({
     ...reg,
-    event: eventsData?.find((e: any) => e.id === reg.event_id)
+    event: reg.event || null,
   }))
 
-  // Fetch upcoming events (events not registered by user)
-  const registeredEventIds = registrations.map((r) => r.event?.id).filter(Boolean)
+  // Get registered event IDs for filtering
+  const registeredEventIds = registrations
+    .map((r) => r.event?.id)
+    .filter(Boolean) as string[]
   
-  let upcomingQuery = supabase
-    .from("events")
-    .select("*")
-    .gte("event_date", new Date().toISOString())
-    .order("event_date", { ascending: true })
-    .limit(6)
-  
-  const { data: allUpcomingEvents } = await upcomingQuery
-  
-  // Filter out registered events on the client side
-  const recommended = (allUpcomingEvents || [])
+  // Filter out registered events
+  const recommended = allUpcomingEvents
     .filter((event) => !registeredEventIds.includes(event.id))
     .slice(0, 3)
 

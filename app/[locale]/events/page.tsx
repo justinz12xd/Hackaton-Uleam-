@@ -1,146 +1,61 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, MapPin, Users, Clock, Plus } from "lucide-react"
+import { Calendar, Plus } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
-import { useRouter } from "next/navigation"
-import { SkeletonEventCard } from "@/components/ui/skeleton"
+import { EventsClient } from "./events-client"
 
-interface Event {
-  id: string
-  title: string
-  description: string
-  event_date: string
-  location: string
-  image_url: string | null
-  max_attendees: number | null
-  status: string
-  organizer_id: string
-  created_at: string
-  registrations_count?: number
-  is_registered?: boolean
-}
+export default async function EventsPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const router = useRouter()
-  const supabase = createClient()
-
-  useEffect(() => {
-    checkUser()
-    fetchEvents()
-  }, [])
-
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
-  }
-
-  const fetchEvents = async () => {
-    setIsLoading(true)
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    // Fetch events
-    const { data: eventsData, error } = await supabase
+  // Fetch events and registrations in parallel with optimized queries
+  const [eventsResponse, registrationsResponse] = await Promise.all([
+    supabase
       .from("events")
       .select("*")
       .neq("status", "cancelled")
-      .order("event_date", { ascending: true })
+      .order("event_date", { ascending: true }),
+    user
+      ? supabase
+          .from("event_registrations")
+          .select("event_id, user_id")
+          .eq("user_id", user.id)
+      : Promise.resolve({ data: [], error: null }),
+  ])
 
-    if (error) {
-      console.error("Error fetching events:", error)
-      setIsLoading(false)
-      return
-    }
+  const events = eventsResponse.data || []
+  const registrations = registrationsResponse.data || []
 
-    // For each event, get registration count and check if user is registered
-    const eventsWithData = await Promise.all(
-      (eventsData || []).map(async (event) => {
-        try {
-          // Get registration count
-          const { count } = await supabase
-            .from("event_registrations")
-            .select("*", { count: "exact", head: true })
-            .eq("event_id", event.id)
+  // Get all event IDs for counting registrations
+  const eventIds = events.map((e) => e.id)
 
-          // Check if current user is registered
-          let isRegistered = false
-          if (user) {
-            const { data: registration, error: regError } = await supabase
-              .from("event_registrations")
-              .select("id")
-              .eq("event_id", event.id)
-              .eq("user_id", user.id)
-              .maybeSingle()
+  // Get registration counts for all events in one query
+  const { data: allRegistrations } = await supabase
+    .from("event_registrations")
+    .select("event_id, user_id")
+    .in("event_id", eventIds)
 
-            if (!regError && registration) {
-              isRegistered = true
-            }
-          }
+  // Count registrations per event and check user registration
+  const registrationsByEvent = (allRegistrations || []).reduce(
+    (acc, reg) => {
+      if (!acc[reg.event_id]) {
+        acc[reg.event_id] = { count: 0, userRegistered: false }
+      }
+      acc[reg.event_id].count++
+      if (user && reg.user_id === user.id) {
+        acc[reg.event_id].userRegistered = true
+      }
+      return acc
+    },
+    {} as Record<string, { count: number; userRegistered: boolean }>
+  )
 
-          return {
-            ...event,
-            registrations_count: count || 0,
-            is_registered: isRegistered,
-          }
-        } catch (error) {
-          console.error(`Error processing event ${event.id}:`, error)
-          return {
-            ...event,
-            registrations_count: 0,
-            is_registered: false,
-          }
-        }
-      })
-    )
-
-    setEvents(eventsWithData)
-    setIsLoading(false)
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
-  }
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const getEventStatus = (event: Event) => {
-    const now = new Date()
-    const eventDate = new Date(event.event_date)
-    
-    if (event.status === "completed") return "Completed"
-    if (event.status === "ongoing") return "Ongoing"
-    if (eventDate < now) return "Past"
-    return "Upcoming"
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Upcoming": return "bg-green-500/10 text-green-500"
-      case "Ongoing": return "bg-blue-500/10 text-blue-500"
-      case "Completed": return "bg-gray-500/10 text-gray-500"
-      case "Past": return "bg-gray-500/10 text-gray-500"
-      default: return "bg-gray-500/10 text-gray-500"
-    }
-  }
+  // Map events with registration data
+  const eventsWithData = events.map((event) => ({
+    ...event,
+    registrations_count: registrationsByEvent[event.id]?.count || 0,
+    is_registered: registrationsByEvent[event.id]?.userRegistered || false,
+  }))
 
   return (
     <main className="min-h-screen bg-background">
@@ -149,20 +64,12 @@ export default function EventsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <h1 className="text-5xl font-bold mb-2">
-                Eventos
-              </h1>
+              <h1 className="text-5xl font-bold mb-2">Eventos</h1>
               <div className="flex gap-4 mt-6">
-                <Button
-                  variant="ghost"
-                  className="hover:bg-accent"
-                >
+                <Button variant="ghost" className="hover:bg-accent">
                   Próximos
                 </Button>
-                <Button
-                  variant="ghost"
-                  className="text-muted-foreground hover:bg-accent hover:text-foreground"
-                >
+                <Button variant="ghost" className="text-muted-foreground hover:bg-accent hover:text-foreground">
                   Pasados
                 </Button>
               </div>
@@ -171,6 +78,7 @@ export default function EventsPage() {
               <div className="flex gap-3">
                 <Link href="/events/create">
                   <Button>
+                    <Plus className="w-4 h-4 mr-2" />
                     Crear evento
                   </Button>
                 </Link>
@@ -180,152 +88,8 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* Events List */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {isLoading ? (
-          <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <SkeletonEventCard key={i} />
-            ))}
-          </div>
-        ) : events.length > 0 ? (
-          <div className="space-y-8">
-            {/* Group events by date */}
-            {Object.entries(
-              events.reduce((acc, event) => {
-                const date = new Date(event.event_date).toLocaleDateString("es-ES", {
-                  day: "numeric",
-                  month: "short",
-                })
-                const dayOfWeek = new Date(event.event_date).toLocaleDateString("es-ES", {
-                  weekday: "long",
-                })
-                const key = `${date}|${dayOfWeek}`
-                if (!acc[key]) acc[key] = []
-                acc[key].push(event)
-                return acc
-              }, {} as Record<string, typeof events>)
-            ).map(([dateKey, dateEvents]) => {
-              const [date, dayOfWeek] = dateKey.split("|")
-              return (
-                <div key={dateKey} className="space-y-4">
-                  {/* Date Header */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm text-muted-foreground">{date}</span>
-                      <span className="w-1 h-1 rounded-full bg-muted"></span>
-                    </div>
-                    <h2 className="text-sm text-muted-foreground capitalize">{dayOfWeek}</h2>
-                  </div>
-
-                  {/* Events for this date */}
-                  <div className="space-y-3">
-                    {dateEvents.map((event) => (
-                      <Link key={event.id} href={`/events/${event.id}`}>
-                        <Card className="hover:shadow-md transition-shadow cursor-pointer overflow-hidden">
-                          <div className="flex gap-4 p-4">
-                            {/* Event Image */}
-                            <div className="relative w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5">
-                              {event.image_url ? (
-                                <img
-                                  src={event.image_url}
-                                  alt={event.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Calendar className="w-12 h-12 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Event Info */}
-                            <div className="flex-1 min-w-0">
-                              {/* Status Badge */}
-                              <div className="flex items-center gap-2 mb-2">
-                                {getEventStatus(event) === "Ongoing" && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-500">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                    EN VIVO
-                                  </span>
-                                )}
-                                <span className="text-sm text-muted-foreground">
-                                  {formatTime(event.event_date)}
-                                </span>
-                              </div>
-
-                              {/* Title */}
-                              <h3 className="text-xl font-semibold mb-2 line-clamp-2 hover:text-primary transition-colors">
-                                {event.title}
-                              </h3>
-
-                              {/* Organizer & Location */}
-                              <div className="space-y-1 mb-3">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <Users className="w-4 h-4" />
-                                  <span className="line-clamp-1">
-                                    {event.registrations_count} asistentes
-                                  </span>
-                                </div>
-                                {event.location && (
-                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <MapPin className="w-4 h-4" />
-                                    <span className="line-clamp-1">{event.location}</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Action Button */}
-                              <div className="flex items-center gap-3">
-                                {event.is_registered ? (
-                                  <span className="px-3 py-1 rounded text-sm font-medium bg-green-500/10 text-green-600">
-                                    Registrado
-                                  </span>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                                    Unirse al evento →
-                                  </span>
-                                )}
-                                {(event.registrations_count ?? 0) > 0 && (
-                                  <div className="flex items-center -space-x-2">
-                                    {Array.from({ length: Math.min(event.registrations_count ?? 0, 3) }).map((_, i) => (
-                                      <div
-                                        key={i}
-                                        className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/70 border-2 border-background"
-                                      />
-                                    ))}
-                                    {(event.registrations_count ?? 0) > 3 && (
-                                      <span className="text-xs text-muted-foreground ml-2">
-                                        +{(event.registrations_count ?? 0) - 3}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground text-lg mb-4">No hay eventos disponibles</p>
-            {user && (
-              <Link href="/events/create">
-                <Button>
-                  Crear el primer evento
-                </Button>
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Client component for events list */}
+      <EventsClient initialEvents={eventsWithData} user={user} />
     </main>
   )
 }
