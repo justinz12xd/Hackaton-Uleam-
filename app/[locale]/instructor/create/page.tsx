@@ -275,11 +275,13 @@ function CreateCoursePageContent() {
 
 export default function CreateCoursePage() {
   return (
-    <Suspense fallback={
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Cargando formulario…</div>
-      </main>
-    }>
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-sm text-muted-foreground">Cargando formulario…</div>
+        </main>
+      }
+    >
       <CreateCoursePageContent />
     </Suspense>
   )
