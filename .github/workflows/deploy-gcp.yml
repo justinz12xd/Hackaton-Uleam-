@@ -15,9 +15,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     
-    # Solo ejecutar si GCP_SA_KEY está configurado
-    if: ${{ secrets.GCP_SA_KEY != '' }}
-    
     permissions:
       contents: read
 
