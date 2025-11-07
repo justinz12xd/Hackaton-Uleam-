@@ -131,12 +131,12 @@ export default function ProfilePage() {
     try {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        throw new Error('Por favor selecciona una imagen válida')
+        throw new Error(t('invalidImage'))
       }
 
       // Validate file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
-        throw new Error('La imagen debe ser menor a 2MB')
+        throw new Error(t('imageTooLarge'))
       }
 
       // Generate unique filename
@@ -180,7 +180,7 @@ export default function ProfilePage() {
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null)
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al subir la imagen')
+      setError(err instanceof Error ? err.message : t('uploadImageError'))
     } finally {
       setIsUploadingImage(false)
     }
@@ -288,10 +288,10 @@ export default function ProfilePage() {
               </div>
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  Haz clic en el ícono de cámara para cambiar tu foto
+                  {t('clickCamera')}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  JPG, PNG o GIF. Máximo 2MB
+                  {t('imageFormats')}
                 </p>
               </div>
             </div>
@@ -319,7 +319,7 @@ export default function ProfilePage() {
                   value={formData.bio}
                   onChange={handleChange}
                   disabled={!isEditing}
-                  placeholder="Add your bio"
+                  placeholder={t('bioPlaceholder')}
                   rows={4}
                 />
               </div>

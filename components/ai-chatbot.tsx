@@ -7,6 +7,7 @@ import { MessageCircle, X, Send, Loader2, ExternalLink } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { Link } from "@/lib/i18n/routing"
+import { useTranslations } from "next-intl"
 
 interface Message {
   role: "user" | "assistant"
@@ -29,6 +30,7 @@ export function AIChatbot() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   // Usar selector para evitar re-renders innecesarios
   const user = useAuthStore((state) => state.user)
+  const t = useTranslations('aiChatbot')
   // Memoizar el cliente de Supabase para evitar recrearlo en cada render
   const supabase = useMemo(() => createClient(), [])
 
@@ -112,7 +114,7 @@ export function AIChatbot() {
   const sendGreeting = async () => {
     const greetingMessage: Message = {
       role: "assistant",
-      content: `¡Hola! 👋 Soy tu asistente de eventos con IA. Puedo ayudarte a encontrar eventos que se ajusten a tus intereses basándome en los eventos a los que te has registrado anteriormente. ¿Te gustaría que te recomiende algunos eventos?`
+      content: t('greeting')
     }
     setMessages([greetingMessage])
   }
@@ -180,7 +182,7 @@ export function AIChatbot() {
       if (!response.ok) {
         const errorData = await response.json()
         console.error("API Error:", errorData)
-        throw new Error(errorData.error || "Error al obtener respuesta")
+        throw new Error(errorData.error || t('apiError'))
       }
 
       const data = await response.json()
@@ -196,7 +198,7 @@ export function AIChatbot() {
       console.error("Error completo:", error)
       const errorMessage: Message = {
         role: "assistant",
-        content: `Lo siento, hubo un error: ${error instanceof Error ? error.message : 'Error desconocido'}. Por favor, verifica que la API key de Groq esté configurada correctamente en .env.local y reinicia el servidor.`
+        content: t('error', { message: error instanceof Error ? error.message : t('unknownError') })
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {

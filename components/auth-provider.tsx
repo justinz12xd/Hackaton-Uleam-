@@ -82,7 +82,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         try {
           if (event === "SIGNED_IN" && session?.user) {
+            console.log("SIGNED_IN event detected, updating state...")
             setLoading(true)
+            
+            // Verificar si el usuario ya está en el store (puede haber sido actualizado por login())
+            const currentUser = useAuthStore.getState().user
+            const currentProfile = useAuthStore.getState().profile
+            
+            // Si el usuario ya está en el store y coincide, no hacer nada
+            if (currentUser?.id === session.user.id && currentProfile) {
+              console.log("User already in store, skipping profile fetch")
+              setLoading(false)
+              return
+            }
+            
             // Fetch profile when user signs in
             const { data: profile, error: profileError } = await supabase
               .from("profiles")
@@ -95,14 +108,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             if (profile) {
+              console.log("Setting user and profile from SIGNED_IN event")
               setUser(session.user)
               setProfile(profile)
             } else {
               // Si no hay perfil, aún así establecer el usuario
+              console.log("Setting user without profile from SIGNED_IN event")
               setUser(session.user)
               setProfile(null)
             }
             setLoading(false)
+            console.log("Auth state updated from SIGNED_IN event")
           } else if (event === "SIGNED_OUT") {
             // Limpiar estado cuando se cierra sesión
             console.log("Usuario cerró sesión, limpiando estado...")

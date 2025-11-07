@@ -35,6 +35,7 @@ import {
 } from '@/lib/types/course-content'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { useTranslations } from 'next-intl'
 
 interface CourseContentEditorProps {
   courseId: string
@@ -43,6 +44,7 @@ interface CourseContentEditorProps {
 
 export default function CourseContentEditor({ courseId, courseTitle }: CourseContentEditorProps) {
   const router = useRouter()
+  const t = useTranslations('courseEditor')
   const [content, setContent] = useState<CourseContent>({ modules: [] })
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -63,7 +65,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
       }
     } catch (error) {
       console.error('Error loading content:', error)
-      toast.error('Error al cargar el contenido')
+      toast.error(t('errorLoading'))
     } finally {
       setIsLoading(false)
     }
@@ -82,19 +84,19 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
   const result = await response.json()
 
   if (!response.ok) {
-    throw new Error(result.error || 'Error al guardar')
+    throw new Error(result.error || t('errorSaving'))
   }
       setIsPublished(Boolean(result.isPublished))
-      toast.success('Contenido guardado exitosamente')
+      toast.success(t('successSaved'))
 
       if (result.isPublished && !wasPublished) {
-        toast.success('El curso se ha publicado automáticamente para los asistentes verificados')
+        toast.success(t('autoPublished'))
       } else if (!result.isPublished) {
-        toast.warning('Agrega al menos una lección para publicar el curso')
+        toast.warning(t('addLessonToPublish'))
       }
     } catch (error) {
       console.error('Error saving content:', error)
-      toast.error(error instanceof Error ? error.message : 'Error al guardar')
+      toast.error(error instanceof Error ? error.message : t('errorSaving'))
     } finally {
       setIsSaving(false)
     }
@@ -113,7 +115,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
   }
 
   const deleteModule = (moduleIndex: number) => {
-    if (confirm('¿Estás seguro de eliminar este módulo y todas sus lecciones?')) {
+    if (confirm(t('deleteModuleConfirm'))) {
       const newModules = content.modules.filter((_, i) => i !== moduleIndex)
       setContent({ modules: newModules })
       toast.success('Módulo eliminado')
@@ -142,7 +144,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
   }
 
   const deleteLesson = (moduleIndex: number, lessonIndex: number) => {
-    if (confirm('¿Estás seguro de eliminar esta lección?')) {
+    if (confirm(t('deleteLessonConfirm'))) {
       const newModules = [...content.modules]
       newModules[moduleIndex].lessons = newModules[moduleIndex].lessons.filter(
         (_, i) => i !== lessonIndex
@@ -194,7 +196,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando contenido...</p>
+          <p className="text-muted-foreground">{t('loadingContent')}</p>
         </div>
       </div>
     )
@@ -225,7 +227,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
             </Badge>
             <Button onClick={saveContent} disabled={isSaving}>
               <Save className="w-4 h-4 mr-2" />
-              {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+              {isSaving ? t('saving') : t('saveChanges')}
             </Button>
           </div>
 
@@ -250,13 +252,13 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
           <Card className="text-center py-12">
             <CardContent>
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No hay módulos todavía</h3>
+              <h3 className="text-lg font-semibold mb-2">{t('noModules')}</h3>
               <p className="text-muted-foreground mb-4">
-                Comienza agregando el primer módulo a tu curso
+                {t('noModules')}
               </p>
               <Button onClick={addModule}>
                 <Plus className="w-4 h-4 mr-2" />
-                Agregar Primer Módulo
+                {t('addFirstModule')}
               </Button>
             </CardContent>
           </Card>
@@ -289,7 +291,7 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
 
             <Button onClick={addModule} variant="outline" className="w-full">
               <Plus className="w-4 h-4 mr-2" />
-              Agregar Módulo
+              {t('addModule')}
             </Button>
           </div>
         )}
@@ -367,7 +369,7 @@ function ModuleEditor({
 
         <AccordionTrigger className="px-6 pb-3 hover:no-underline">
           <span className="text-sm text-muted-foreground">
-            {module.lessons.length === 0 ? 'Sin lecciones' : 'Ver lecciones'}
+            {module.lessons.length === 0 ? t('noLessons') : t('viewLessons')}
           </span>
         </AccordionTrigger>
 
@@ -377,11 +379,11 @@ function ModuleEditor({
               <div className="text-center py-8 border-2 border-dashed rounded-lg">
                 <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
                 <p className="text-sm text-muted-foreground mb-4">
-                  Este módulo no tiene lecciones todavía
+                  {t('moduleNoLessons')}
                 </p>
                 <Button onClick={onAddLesson} variant="default" size="sm">
                   <Plus className="w-4 h-4 mr-2" />
-                  Agregar Primera Lección
+                  {t('addFirstLesson')}
                 </Button>
               </div>
             ) : (
@@ -404,7 +406,7 @@ function ModuleEditor({
 
                 <Button onClick={onAddLesson} variant="outline" size="sm" className="w-full">
                   <Plus className="w-4 h-4 mr-2" />
-                  Agregar Lección
+                  {t('addLesson')}
                 </Button>
               </>
             )}
@@ -461,10 +463,10 @@ function LessonEditor({
                   <SelectValue placeholder="Tipo de contenido" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="video">📹 Video</SelectItem>
-                  <SelectItem value="text">📝 Texto/Artículo</SelectItem>
-                  <SelectItem value="pdf">📄 Documento PDF</SelectItem>
-                  <SelectItem value="quiz">❓ Quiz/Evaluación</SelectItem>
+                  <SelectItem value="video">📹 {t('video')}</SelectItem>
+                  <SelectItem value="text">📝 {t('text')}</SelectItem>
+                  <SelectItem value="pdf">📄 {t('pdf')}</SelectItem>
+                  <SelectItem value="quiz">❓ {t('quiz')}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -472,7 +474,7 @@ function LessonEditor({
                 type="number"
                 value={lesson.duration || 0}
                 onChange={(e) => onUpdate({ duration: parseInt(e.target.value) })}
-                placeholder="Duración (minutos)"
+                placeholder={t('duration')}
                 min="0"
               />
             </div>
@@ -540,7 +542,7 @@ function LessonEditor({
                   rel="noopener noreferrer"
                   className="underline"
                 >
-                  Ver
+                  {t('view')}
                 </a>
               </div>
             )}
@@ -553,7 +555,7 @@ function LessonEditor({
             <label className="text-sm font-medium">Recursos Adicionales</label>
             <Button onClick={onAddResource} variant="outline" size="sm">
               <Plus className="w-3 h-3 mr-1" />
-              Agregar
+              {t('addResource')}
             </Button>
           </div>
 

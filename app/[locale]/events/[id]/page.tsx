@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Calendar, MapPin, Users, Clock, ArrowLeft, Check, Download, Camera, X, Upload, FileText, Image as ImageIcon, ChevronDown } from "lucide-react"
 import { Link, useRouter } from "@/lib/i18n/routing"
 import { useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import QRCode from "qrcode"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -55,6 +56,7 @@ interface OrganizerProfile {
 export default function EventDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const t = useTranslations('events')
   const [event, setEvent] = useState<Event | null>(null)
   const [registration, setRegistration] = useState<Registration | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string>("")
@@ -349,7 +351,7 @@ export default function EventDetailPage() {
 
     if (error) {
       console.error("Error updating attendance:", error)
-      alert("Error al actualizar asistencia")
+      alert(t('errorUpdatingAttendance'))
       return
     }
 
@@ -399,7 +401,7 @@ export default function EventDetailPage() {
 
     if (error) {
       console.error("Error registering:", error)
-      alert("Error registering for event")
+      alert(t('errorRegistering'))
       setIsRegistering(false)
       return
     }
@@ -446,7 +448,7 @@ export default function EventDetailPage() {
       )
     } catch (err) {
       console.error("Error starting scanner:", err)
-      setScanError("No se pudo iniciar la cámara. Verifica los permisos.")
+      setScanError(t('errorStartingCamera'))
       setIsScanning(false)
     }
   }
@@ -485,13 +487,13 @@ export default function EventDetailPage() {
 
     if (regError) {
       console.error("❌ Error fetching registration:", regError)
-      setScanError("Error al buscar registro: " + regError.message)
+      setScanError(t('errorFindingRegistration', { message: regError.message }))
       return
     }
 
     if (!regData) {
       console.log("❌ Registration not found for this QR and event")
-      setScanError("Registro no encontrado para este evento. Verifica que el QR sea correcto.")
+      setScanError(t('registrationNotFound'))
       return
     }
 
@@ -506,7 +508,7 @@ export default function EventDetailPage() {
     // Check if already attended
     if (regData.is_attended) {
       console.log("⚠️ User already marked as attended at:", regData.attended_at)
-      setScanError(`Este usuario ya marcó asistencia el ${new Date(regData.attended_at).toLocaleString()}`)
+      setScanError(t('alreadyAttended', { date: new Date(regData.attended_at).toLocaleString() }))
       return
     }
 
@@ -527,7 +529,7 @@ export default function EventDetailPage() {
 
     if (updateError) {
       console.error("❌ Error updating attendance:", updateError)
-      setScanError("Error al marcar asistencia: " + updateError.message)
+      setScanError(t('errorMarkingAttendance', { message: updateError.message }))
       return
     }
 
@@ -606,7 +608,7 @@ export default function EventDetailPage() {
 
       if (uploadError) {
         console.error("Upload error:", uploadError)
-        alert("Error al subir el archivo: " + uploadError.message)
+        alert(t('errorUploadingFile', { message: uploadError.message }))
         return
       }
 
@@ -631,7 +633,7 @@ export default function EventDetailPage() {
 
       if (dbError) {
         console.error("Database error:", dbError)
-        alert("Error al guardar el recurso: " + dbError.message)
+        alert(t('errorSavingResource', { message: dbError.message }))
         return
       }
 
@@ -648,7 +650,7 @@ export default function EventDetailPage() {
 
     } catch (error) {
       console.error("Error:", error)
-      alert("Error inesperado al subir el recurso")
+      alert(t('unexpectedError'))
     } finally {
       setIsUploadingResource(false)
     }
@@ -672,9 +674,9 @@ export default function EventDetailPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">Event not found</p>
+          <p className="text-muted-foreground mb-4">{t('eventNotFound')}</p>
           <Link href="/events">
-            <Button>Back to Events</Button>
+            <Button>{t('backToEvents')}</Button>
           </Link>
         </div>
       </div>
@@ -720,7 +722,7 @@ export default function EventDetailPage() {
             )}
             
             <p className="text-sm text-muted-foreground text-center">
-              Coloca el código QR frente a la cámara
+              {t('placeQRInFront')}
             </p>
           </div>
         </DialogContent>
@@ -732,52 +734,52 @@ export default function EventDetailPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="w-5 h-5" />
-              Añadir Recurso del Evento
+              {t('addEventResource')}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleResourceUpload} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="resourceTitle">Título del Recurso *</Label>
+              <Label htmlFor="resourceTitle">{t('resourceTitle')}</Label>
               <input
                 id="resourceTitle"
                 type="text"
                 value={resourceTitle}
                 onChange={(e) => setResourceTitle(e.target.value)}
-                placeholder="Ej: Presentación del taller"
+                placeholder={t('resourceTitlePlaceholder')}
                 className="w-full px-3 py-2 border rounded-md"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="resourceDescription">Descripción</Label>
+              <Label htmlFor="resourceDescription">{t('resourceDescription')}</Label>
               <textarea
                 id="resourceDescription"
                 value={resourceDescription}
                 onChange={(e) => setResourceDescription(e.target.value)}
-                placeholder="Describe el recurso (opcional)"
+                placeholder={t('resourceDescriptionPlaceholder')}
                 className="w-full px-3 py-2 border rounded-md min-h-[80px]"
                 rows={3}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="resourceType">Tipo de Recurso</Label>
+              <Label htmlFor="resourceType">{t('resourceType')}</Label>
               <select
                 id="resourceType"
                 value={resourceType}
                 onChange={(e) => setResourceType(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md"
               >
-                <option value="document">Documento</option>
-                <option value="pdf">PDF</option>
-                <option value="photo">Foto</option>
-                <option value="other">Otro</option>
+                <option value="document">{t('document')}</option>
+                <option value="pdf">{t('pdf')}</option>
+                <option value="photo">{t('photo')}</option>
+                <option value="other">{t('other')}</option>
               </select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="resourceFile">Archivo *</Label>
+              <Label htmlFor="resourceFile">{t('resourceFile')}</Label>
               <div className="flex items-center gap-2">
                 <input
                   id="resourceFile"
@@ -808,7 +810,7 @@ export default function EventDetailPage() {
                 }}
                 disabled={isUploadingResource}
               >
-                Cancelar
+                {t('cancel')}
               </Button>
               <Button
                 type="submit"
@@ -818,12 +820,12 @@ export default function EventDetailPage() {
                 {isUploadingResource ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Subiendo...
+                    {t('uploading')}
                   </>
                 ) : (
                   <>
                     <Upload className="w-4 h-4" />
-                    Subir Recurso
+                    {t('uploadResource')}
                   </>
                 )}
               </Button>
@@ -837,7 +839,7 @@ export default function EventDetailPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Link href="/events" className="inline-flex items-center gap-2 text-primary hover:text-primary/80 mb-4">
             <ArrowLeft className="w-4 h-4" />
-            Back to Events
+            {t('backToEvents')}
           </Link>
         </div>
       </div>
@@ -873,7 +875,7 @@ export default function EventDetailPage() {
                   </Badge>
                   {isOrganizer && (
                     <Badge variant="default" className="text-sm">
-                      Tú eres el organizador
+                      {t('youAreOrganizer')}
                     </Badge>
                   )}
                 </div>
@@ -936,10 +938,10 @@ export default function EventDetailPage() {
                         className="flex items-center gap-2 p-2 rounded-lg border bg-muted/50"
                       >
                         <Badge variant="secondary" className="text-xs">
-                          Colaborador
+                          {t('collaborator')}
                         </Badge>
                         <span className="text-sm">
-                          {collab.profiles?.full_name || collab.profiles?.email || "Usuario"}
+                          {collab.profiles?.full_name || collab.profiles?.email || t('user')}
                         </span>
                       </div>
                     ))}
@@ -1015,7 +1017,7 @@ export default function EventDetailPage() {
                     <Link href={`/instructor/create?eventId=${event.id}`}>
                       <Button className="w-full gap-2" variant="default">
                         <FileText className="w-4 h-4" />
-                        Crear Nuevo Curso
+                        {t('createNewCourse')}
                       </Button>
                     </Link>
 
@@ -1036,7 +1038,7 @@ export default function EventDetailPage() {
                               </p>
                               <div className="flex items-center gap-2 mt-1">
                                 <Badge variant={eventCourse.courses.is_published ? "default" : "secondary"} className="text-xs">
-                                  {eventCourse.courses.is_published ? "Publicado" : "Borrador"}
+                                  {eventCourse.courses.is_published ? t('published') : t('draft')}
                                 </Badge>
                               </div>
                             </div>
@@ -1048,7 +1050,7 @@ export default function EventDetailPage() {
                     {eventCourses.length === 0 && (
                       <Alert>
                         <AlertDescription className="text-sm">
-                          No hay cursos asociados aún. Crea uno para tus asistentes.
+                          {t('noCoursesYet')}
                         </AlertDescription>
                       </Alert>
                     )}
@@ -1073,7 +1075,7 @@ export default function EventDetailPage() {
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {attendees.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">
-                          No hay registros aún
+                          {t('noRegistrationsYet')}
                         </p>
                       ) : (
                         attendees.map((attendee) => (
@@ -1083,17 +1085,17 @@ export default function EventDetailPage() {
                           >
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">
-                                {attendee.profiles?.full_name || attendee.profiles?.email || "Usuario"}
+                                {attendee.profiles?.full_name || attendee.profiles?.email || t('user')}
                               </p>
                               <div className="flex items-center gap-2 mt-1">
                                 {attendee.is_collaborator && (
                                   <Badge variant="secondary" className="text-xs">
-                                    Colaborador
+                                    {t('collaborator')}
                                   </Badge>
                                 )}
                                 {attendee.is_attended ? (
                                   <Badge variant="default" className="text-xs bg-green-500">
-                                    ✓ Asistió
+                                    ✓ {t('attended')}
                                   </Badge>
                                 ) : (
                                   <Badge variant="outline" className="text-xs">
@@ -1108,7 +1110,7 @@ export default function EventDetailPage() {
                               onClick={() => toggleAttendance(attendee.id, attendee.is_attended)}
                               className="ml-2"
                             >
-                              {attendee.is_attended ? "Desmarcar" : "Marcar"}
+                              {attendee.is_attended ? t('unmarkAttendance') : t('markAttendance')}
                             </Button>
                           </div>
                         ))
@@ -1145,7 +1147,7 @@ export default function EventDetailPage() {
                     </Button>
 
                     <p className="text-sm text-muted-foreground text-center">
-                      Muestra este código QR en el evento para marcar asistencia
+                      {t('scanQR')}
                     </p>
 
                     {/* Resources Section - Right below QR */}
@@ -1223,7 +1225,7 @@ export default function EventDetailPage() {
                           ) : (
                             <Alert>
                               <AlertDescription>
-                                No hay recursos disponibles para este evento.
+                                {t('noResources')}
                               </AlertDescription>
                             </Alert>
                           )}
@@ -1231,7 +1233,7 @@ export default function EventDetailPage() {
                           {/* Button to see available courses - Simplified with gradient */}
                           <Link href="/courses" className="block mt-4">
                             <Button className="w-full gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
-                              Ver Cursos Relacionados
+                              {t('viewRelatedCourses')}
                             </Button>
                           </Link>
                         </>

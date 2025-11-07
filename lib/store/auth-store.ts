@@ -45,12 +45,22 @@ export const useAuthStore = create<AuthState>()(
 
       setLoading: (loading) => set({ isLoading: loading }),
 
-      login: (user, profile) => set({
-        user,
-        profile,
-        isAuthenticated: true,
-        isLoading: false,
-      }),
+      login: (user, profile) => {
+        console.log("Login action called:", { userEmail: user?.email, profileName: profile?.full_name })
+        set({
+          user,
+          profile,
+          isAuthenticated: true,
+          isLoading: false,
+        })
+        // Forzar sincronización inmediata
+        const state = useAuthStore.getState()
+        console.log("Login state after set:", {
+          user: state.user?.email,
+          profile: state.profile?.full_name,
+          isAuthenticated: state.isAuthenticated
+        })
+      },
 
       logout: () => {
         // Limpiar estado
@@ -90,6 +100,13 @@ export const useAuthStore = create<AuthState>()(
         profile: state.profile,
         isAuthenticated: state.isAuthenticated,
       }),
+      // Asegurar que el estado se sincronice correctamente
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Asegurar que isAuthenticated esté sincronizado con user
+          state.isAuthenticated = !!state.user
+        }
+      },
     }
   )
 )
