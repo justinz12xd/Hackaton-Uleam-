@@ -306,4 +306,4 @@ export default function CoursesPage() {
       )}
     </main>
   )
-
+}
