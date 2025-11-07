@@ -1,31 +1,40 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { 
-  PlayCircle, 
-  FileText, 
-  Download, 
-  CheckCircle, 
-  Circle, 
+import {
+  PlayCircle,
+  FileText,
+  Download,
+  CheckCircle,
+  Circle,
   BookOpen,
-  Video,
-  Link as LinkIcon,
-  Clock,
-  Award
+  Award,
+  Check,
+  Award as AwardIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CourseContent, CourseModule, CourseLesson, CourseResource } from '@/lib/types/course-content'
+import { getNextLessonId } from '@/lib/types/course-content'
 
 interface CourseViewerProps {
   courseId: string
   courseTitle: string
   content: CourseContent | null
   isEnrolled: boolean
+  enrollmentId?: string | null
+  studentName?: string | null
+  studentEmail?: string | null
+  eventContext?: {
+    id: string
+    title: string
+    organizerName?: string | null
+  } | null
+  locale?: string
 }
 
 interface LessonProgress {
@@ -42,7 +51,25 @@ interface ProgressStats {
   courseCompleted: boolean
 }
 
-export default function CourseViewer({ courseId, courseTitle, content, isEnrolled }: CourseViewerProps) {
+interface CertificateInfo {
+  certificateNumber: string
+  credentialId: string | null
+  qrCodeDataUrl: string
+  verificationUrl: string
+  issuedAt: string
+}
+
+export default function CourseViewer({
+  courseId,
+  courseTitle,
+  content,
+  isEnrolled,
+  enrollmentId,
+  studentName,
+  studentEmail,
+  eventContext,
+  locale = 'es'
+}: CourseViewerProps) {
   const [selectedLesson, setSelectedLesson] = useState<{
     module: CourseModule
     lesson: CourseLesson
@@ -55,11 +82,15 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
     courseCompleted: false
   })
   const [isLoadingProgress, setIsLoadingProgress] = useState(false)
+  const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false)
+  const [certificateInfo, setCertificateInfo] = useState<CertificateInfo | null>(null)
+  const [autoGenerationTriggered, setAutoGenerationTriggered] = useState(false)
 
   // Cargar progreso del estudiante
   useEffect(() => {
     if (isEnrolled) {
       loadProgress()
+      loadExistingCertificate()
     }
   }, [isEnrolled, courseId])
 
@@ -76,6 +107,21 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
     }
   }, [content])
 
+  // Intentar generar certificado automáticamente cuando se complete el curso
+  useEffect(() => {
+    if (
+      isEnrolled &&
+      stats.courseCompleted &&
+      enrollmentId &&
+      !certificateInfo &&
+      !isGeneratingCertificate &&
+      !autoGenerationTriggered
+    ) {
+      setAutoGenerationTriggered(true)
+      handleGenerateCertificate()
+    }
+  }, [stats.courseCompleted, enrollmentId, certificateInfo, isGeneratingCertificate, isEnrolled])
+
   const loadProgress = async () => {
     try {
       const response = await fetch(`/api/courses/${courseId}/progress`)
@@ -91,6 +137,22 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
       })
     } catch (error) {
       console.error('Error loading progress:', error)
+    }
+  }
+
+  const loadExistingCertificate = async () => {
+    try {
+      const response = await fetch(`/api/certificates/status?courseId=${courseId}`)
+      if (!response.ok) {
+        return
+      }
+
+      const data = await response.json()
+      if (data?.certificate) {
+        setCertificateInfo(data.certificate)
+      }
+    } catch (error) {
+      console.error('Error fetching certificate status:', error)
     }
   }
 
@@ -133,7 +195,7 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
         // Si completó el curso al 100%
         if (data.stats.courseCompleted) {
           toast.success('🎉 ¡Felicidades! Has completado el curso', {
-            description: 'Tu certificado está siendo generado'
+            description: 'Generaremos tu certificado en un momento'
           })
         }
       } else {
@@ -144,6 +206,95 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
       toast.error('Error al actualizar el progreso')
     } finally {
       setIsLoadingProgress(false)
+    }
+  }
+
+  const totalLessonsInCourse = useMemo(() => {
+    if (!content?.modules) return 0
+    return content.modules.reduce((total, module) => total + (module.lessons?.length || 0), 0)
+  }, [content])
+
+  const nextLessonId = useMemo(() => {
+    if (!content || !selectedLesson) return null
+    return getNextLessonId(content, selectedLesson.lesson.id)
+  }, [content, selectedLesson])
+
+  const getNormalizedVideoUrl = (url: string) => {
+    if (!url) return null
+
+    try {
+      const parsed = new URL(url)
+      if (parsed.hostname.includes('youtube.com')) {
+        const videoId = parsed.searchParams.get('v')
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}`
+        }
+      }
+
+      if (parsed.hostname === 'youtu.be') {
+        return `https://www.youtube.com/embed${parsed.pathname}`
+      }
+
+      return url
+    } catch (error) {
+      console.warn('Invalid video URL provided, using raw value:', url)
+      return url
+    }
+  }
+
+  const handleGenerateCertificate = async () => {
+    if (!enrollmentId) {
+      toast.error('No pudimos encontrar tu inscripción al curso')
+      return
+    }
+
+    setIsGeneratingCertificate(true)
+    try {
+      const response = await fetch('/api/certificates/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId,
+          enrollmentId,
+          locale,
+          studentName,
+          studentEmail,
+          eventContext,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Error desconocido' }))
+        throw new Error(error.error || 'No se pudo generar el certificado')
+      }
+
+      const data = await response.json()
+
+      setCertificateInfo({
+        certificateNumber: data.certificateNumber,
+        credentialId: data.credentialId || null,
+        qrCodeDataUrl: data.qrCodeDataUrl,
+        verificationUrl: data.verificationUrl,
+        issuedAt: data.issuedAt,
+      })
+
+      toast.success('Tu certificado ha sido generado correctamente')
+    } catch (error) {
+      console.error('Error generating certificate:', error)
+      toast.error(error instanceof Error ? error.message : 'No se pudo generar el certificado')
+    } finally {
+      setIsGeneratingCertificate(false)
+    }
+  }
+
+  const handleCertificateAction = () => {
+    if (certificateInfo?.verificationUrl) {
+      window.open(certificateInfo.verificationUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
+
+    if (!isGeneratingCertificate) {
+      void handleGenerateCertificate()
     }
   }
 
@@ -317,33 +468,6 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
                     </CardDescription>
                   )}
                 </div>
-                {isEnrolled && (
-                  <Button
-                    onClick={() => toggleLessonComplete(
-                      selectedLesson.module.id,
-                      selectedLesson.lesson.id
-                    )}
-                    disabled={isLoadingProgress}
-                    variant={
-                      isLessonCompleted(selectedLesson.module.id, selectedLesson.lesson.id)
-                        ? 'outline'
-                        : 'default'
-                    }
-                    className="shrink-0"
-                  >
-                    {isLessonCompleted(selectedLesson.module.id, selectedLesson.lesson.id) ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Completada
-                      </>
-                    ) : (
-                      <>
-                        <Circle className="w-4 h-4 mr-2" />
-                        Marcar como completada
-                      </>
-                    )}
-                  </Button>
-                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -351,7 +475,7 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
               {selectedLesson.lesson.videoUrl && (
                 <div className="aspect-video bg-black rounded-lg overflow-hidden">
                   <iframe
-                    src={selectedLesson.lesson.videoUrl}
+                    src={getNormalizedVideoUrl(selectedLesson.lesson.videoUrl) || undefined}
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
@@ -406,6 +530,74 @@ export default function CourseViewer({ courseId, courseTitle, content, isEnrolle
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>Esta lección aún no tiene contenido disponible</p>
+                </div>
+              )}
+
+              {isEnrolled && (
+                <div className="space-y-4 pt-4 border-t">
+                  <Button
+                    onClick={() => toggleLessonComplete(selectedLesson.module.id, selectedLesson.lesson.id)}
+                    disabled={isLoadingProgress}
+                    variant={isLessonCompleted(selectedLesson.module.id, selectedLesson.lesson.id) ? 'secondary' : 'default'}
+                    className="w-full gap-2"
+                  >
+                    {isLessonCompleted(selectedLesson.module.id, selectedLesson.lesson.id) ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Lección completada
+                      </>
+                    ) : (
+                      <>
+                        <Circle className="w-4 h-4" />
+                        Marcar lección como completada
+                      </>
+                    )}
+                  </Button>
+
+                  {stats.courseCompleted && (
+                    <div className="space-y-3">
+                      <Button
+                        onClick={handleCertificateAction}
+                        disabled={isGeneratingCertificate}
+                        className="w-full gap-2"
+                      >
+                        <AwardIcon className="w-4 h-4" />
+                        {certificateInfo ? 'Ver certificado' : 'Generar certificado'}
+                      </Button>
+
+                      {certificateInfo && (
+                        <div className="border rounded-lg p-4 text-center space-y-3">
+                          <p className="text-sm font-semibold">Certificado listo</p>
+                          <p className="text-xs text-muted-foreground">
+                            Escanea el código QR o abre el certificado para compartirlo.
+                          </p>
+                          <div className="flex justify-center">
+                            <img
+                              src={certificateInfo.qrCodeDataUrl}
+                              alt="QR del certificado"
+                              className="w-40 h-40 rounded-lg border"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-xs font-mono text-muted-foreground">
+                              {certificateInfo.certificateNumber}
+                            </p>
+                            <Button asChild variant="outline" size="sm" className="w-full">
+                              <a href={certificateInfo.verificationUrl} target="_blank" rel="noopener noreferrer">
+                                Abrir certificado
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!stats.courseCompleted && !nextLessonId && totalLessonsInCourse > 0 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      ¡Estás en la última lección! Marca la lección como completada para finalizar el curso.
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>

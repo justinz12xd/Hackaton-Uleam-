@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { countTotalLessons } from '@/lib/types/course-content'
+import type { CourseContent } from '@/lib/types/course-content'
 import { NextRequest, NextResponse } from 'next/server'
 
 // GET: Obtener progreso del estudiante en el curso
@@ -34,9 +36,32 @@ export async function GET(
       )
     }
 
+    // Obtener contenido del curso para contar todas las lecciones existentes
+    let totalLessons = 0
+    try {
+      const { data: courseContentRow } = await supabase
+        .from('courses')
+        .select('content')
+        .eq('id', courseId)
+        .single()
+
+      if (courseContentRow?.content) {
+        const content: CourseContent =
+          typeof courseContentRow.content === 'string'
+            ? JSON.parse(courseContentRow.content)
+            : courseContentRow.content
+
+        totalLessons = countTotalLessons(content)
+      }
+    } catch (error) {
+      console.warn('No se pudo calcular el número total de lecciones', error)
+    }
+
     // Calcular estadísticas
     const completedLessons = progressData?.filter(p => p.completed).length || 0
-    const totalLessons = progressData?.length || 0
+    if (totalLessons === 0) {
+      totalLessons = progressData?.length || 0
+    }
     const progressPercentage = totalLessons > 0 
       ? Math.round((completedLessons / totalLessons) * 100) 
       : 0
@@ -137,8 +162,30 @@ export async function POST(
       .eq('course_id', courseId)
       .eq('student_id', user.id)
 
+    let totalLessons = 0
+    try {
+      const { data: courseContentRow } = await supabase
+        .from('courses')
+        .select('content')
+        .eq('id', courseId)
+        .single()
+
+      if (courseContentRow?.content) {
+        const content: CourseContent =
+          typeof courseContentRow.content === 'string'
+            ? JSON.parse(courseContentRow.content)
+            : courseContentRow.content
+
+        totalLessons = countTotalLessons(content)
+      }
+    } catch (error) {
+      console.warn('No se pudo calcular el número total de lecciones', error)
+    }
+
     const completedLessons = allProgress?.filter(p => p.completed).length || 0
-    const totalLessons = allProgress?.length || 0
+    if (totalLessons === 0) {
+      totalLessons = allProgress?.length || 0
+    }
     const progressPercentage = totalLessons > 0 
       ? Math.round((completedLessons / totalLessons) * 100) 
       : 0

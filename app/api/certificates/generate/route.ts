@@ -1,17 +1,25 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
+import QRCode from "qrcode"
+import { sendEmail } from "@/lib/email/resend"
+import { renderCertificateEmail } from "@/components/emails/certificate-email"
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: user } = await supabase.auth.getUser()
+    const {
+      data: authData,
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (!user) {
+    if (authError || !authData?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const currentUser = authData.user
+
     const body = await request.json()
-    const { courseId, enrollmentId } = body
+    const { courseId, enrollmentId, locale = "es", studentName, studentEmail, eventContext } = body
 
     if (!courseId || !enrollmentId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -29,7 +37,7 @@ export async function POST(request: NextRequest) {
       .from("course_enrollments")
       .select("*")
       .eq("id", enrollmentId)
-      .eq("student_id", user.id)
+      .eq("student_id", currentUser.id)
       .single()
 
     if (!enrollmentResponse.data) {
@@ -39,23 +47,29 @@ export async function POST(request: NextRequest) {
     // Generate certificate number
     const certificateNumber = `EDUC-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
-    // Create QR code data (in real app, would encode certificate info)
-    const qrCodeData = JSON.stringify({
-      certificateNumber,
-      studentId: user.id,
-      courseId,
-      issuedAt: new Date().toISOString(),
-    })
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
+    const verificationUrl = `${baseUrl.replace(/\/$/, "")}/certificates/${certificateNumber}`
+    const qrCodeDataUrl = await QRCode.toDataURL(verificationUrl, { margin: 1 })
 
     // Check if microcredential already exists
     const existingCredential = await supabase
       .from("microcredentials")
       .select("*")
       .eq("course_id", courseId)
-      .eq("student_id", user.id)
+      .eq("student_id", currentUser.id)
       .single()
 
     let credentialId
+
+    const metadata = {
+      eventId: eventContext?.id || null,
+      eventTitle: eventContext?.title || null,
+      organizerName: eventContext?.organizerName || null,
+      participantName: studentName || currentUser.email || "Participante",
+      courseTitle: courseResponse.data.title,
+      verificationUrl,
+      qrCodeDataUrl,
+    }
 
     if (existingCredential.data) {
       // Update existing credential
@@ -66,7 +80,8 @@ export async function POST(request: NextRequest) {
           status: "completed",
           issue_date: new Date().toISOString(),
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          qr_code_data: qrCodeData,
+          qr_code_data: verificationUrl,
+          metadata,
         })
         .eq("id", credentialId)
     } else {
@@ -76,11 +91,12 @@ export async function POST(request: NextRequest) {
         .insert([
           {
             course_id: courseId,
-            student_id: user.id,
+            student_id: currentUser.id,
             status: "completed",
             issue_date: new Date().toISOString(),
             expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-            qr_code_data: qrCodeData,
+            qr_code_data: verificationUrl,
+            metadata,
           },
         ])
         .select()
@@ -113,11 +129,44 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", enrollmentId)
 
+    const issuedAt = certificateResponse.data?.issue_date || new Date().toISOString()
+
+    if (studentEmail) {
+      const formatter = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-ES", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+
+      const emailHtml = renderCertificateEmail({
+        participantName: studentName || currentUser.email || "Participante",
+        courseName: courseResponse.data.title,
+        eventName: eventContext?.title || null,
+        organizerName: eventContext?.organizerName || null,
+        issueDate: formatter.format(new Date(issuedAt)),
+        certificateNumber,
+        verificationUrl,
+        qrCodeDataUrl,
+      })
+
+      try {
+        await sendEmail({
+          to: studentEmail,
+          subject: `Tu certificado: ${courseResponse.data.title}`,
+          html: emailHtml,
+        })
+      } catch (emailError) {
+        console.warn("No se pudo enviar el correo del certificado", emailError)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       certificateNumber,
       credentialId,
-      qrCodeData,
+      verificationUrl,
+      qrCodeDataUrl,
+      issuedAt,
     })
   } catch (error) {
     console.error("Error generating certificate:", error)
