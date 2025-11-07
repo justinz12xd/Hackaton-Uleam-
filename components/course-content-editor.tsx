@@ -347,6 +347,8 @@ function ModuleEditor({
   onUpdateResource,
   onDeleteResource,
 }: ModuleEditorProps) {
+  const t = useTranslations('courseEditor')
+
   return (
     <AccordionItem value={module.id} className="border rounded-lg">
       <Card>
@@ -454,6 +456,8 @@ function LessonEditor({
   onUpdateResource,
   onDeleteResource,
 }: LessonEditorProps) {
+  const t = useTranslations('courseEditor')
+
   return (
     <Card className="border-l-4 border-l-primary">
       <CardContent className="p-4 space-y-4">
