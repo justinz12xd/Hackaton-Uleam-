@@ -17,6 +17,8 @@ export default function CreateEventPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [resourceFile, setResourceFile] = useState<File | null>(null)
+  const [uploadingResource, setUploadingResource] = useState(false)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -25,7 +27,6 @@ export default function CreateEventPage() {
     location: "",
     location_type: "presencial",
     max_attendees: "",
-    resources_url: "",
     category: "",
     tags: "",
   })
@@ -70,6 +71,30 @@ export default function CreateEventPage() {
     setImagePreview(null)
   }
 
+  const handleResourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type (PDF or ZIP)
+      const validTypes = ['application/pdf', 'application/zip', 'application/x-zip-compressed']
+      if (!validTypes.includes(file.type)) {
+        alert('Por favor selecciona un archivo PDF o ZIP')
+        return
+      }
+      
+      // Validate file size (max 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        alert('El archivo debe ser menor a 50MB')
+        return
+      }
+
+      setResourceFile(file)
+    }
+  }
+
+  const removeResource = () => {
+    setResourceFile(null)
+  }
+
   const uploadImage = async (userId: string): Promise<string | null> => {
     if (!imageFile) return null
 
@@ -108,6 +133,44 @@ export default function CreateEventPage() {
     }
   }
 
+  const uploadResource = async (userId: string): Promise<string | null> => {
+    if (!resourceFile) return null
+
+    setUploadingResource(true)
+
+    try {
+      // Create unique filename
+      const fileExt = resourceFile.name.split('.').pop()
+      const fileName = `${userId}-${Date.now()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('Recursos-Eventos')
+        .upload(filePath, resourceFile, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (error) {
+        console.error('Error uploading resource:', error)
+        return null
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('Recursos-Eventos')
+        .getPublicUrl(filePath)
+
+      return publicUrl
+    } catch (error) {
+      console.error('Error uploading resource:', error)
+      return null
+    } finally {
+      setUploadingResource(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsCreating(true)
@@ -130,6 +193,15 @@ export default function CreateEventPage() {
       }
     }
 
+    // Upload resource file if exists
+    let resourceUrl = null
+    if (resourceFile) {
+      resourceUrl = await uploadResource(user.id)
+      if (!resourceUrl) {
+        alert("Error al subir el recurso. El evento se creará sin recurso.")
+      }
+    }
+
     // Combine date and time
     const eventDateTime = `${formData.event_date}T${formData.event_time}:00`
 
@@ -142,7 +214,7 @@ export default function CreateEventPage() {
         location: formData.location,
         image_url: imageUrl,
         max_attendees: formData.max_attendees ? parseInt(formData.max_attendees) : null,
-        resources_url: formData.resources_url || null,
+        resources_url: resourceUrl,
         organizer_id: user.id,
         status: "upcoming",
       })
@@ -369,33 +441,66 @@ export default function CreateEventPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="resources_url">URL de Recursos</Label>
-                <Input
-                  id="resources_url"
-                  name="resources_url"
-                  type="url"
-                  placeholder="https://ejemplo.com/recursos"
-                  value={formData.resources_url}
-                  onChange={handleChange}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Los asistentes podrán acceder a estos recursos después del check-in
-                </p>
+                <Label>Recurso del Evento (PDF o ZIP)</Label>
+                <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+                  {resourceFile ? (
+                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Upload className="w-8 h-8 text-primary" />
+                        <div>
+                          <p className="font-medium">{resourceFile.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(resourceFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        onClick={removeResource}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                      <Label
+                        htmlFor="resource-upload"
+                        className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Subir Recurso
+                      </Label>
+                      <Input
+                        id="resource-upload"
+                        type="file"
+                        accept=".pdf,.zip"
+                        className="hidden"
+                        onChange={handleResourceChange}
+                      />
+                      <p className="text-sm text-muted-foreground mt-2">
+                        PDF o ZIP hasta 50MB - Los asistentes registrados podrán descargarlo
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-4 pt-4">
                 <Button
                   type="submit"
-                  disabled={isCreating || uploadingImage}
+                  disabled={isCreating || uploadingImage || uploadingResource}
                   className="flex-1"
                 >
-                  {isCreating ? "Creando evento..." : uploadingImage ? "Subiendo imagen..." : "Crear Evento"}
+                  {isCreating ? "Creando evento..." : uploadingImage ? "Subiendo imagen..." : uploadingResource ? "Subiendo recurso..." : "Crear Evento"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.back()}
-                  disabled={isCreating || uploadingImage}
+                  disabled={isCreating || uploadingImage || uploadingResource}
                 >
                   Cancelar
                 </Button>

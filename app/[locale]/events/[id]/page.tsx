@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, MapPin, Users, Clock, ArrowLeft, Check, Download, Camera, X, Upload, FileText, Image as ImageIcon } from "lucide-react"
+import { Calendar, MapPin, Users, Clock, ArrowLeft, Check, Download, Camera, X, Upload, FileText, Image as ImageIcon, ChevronDown } from "lucide-react"
 import { Link, useRouter } from "@/lib/i18n/routing"
 import { useParams } from "next/navigation"
 import QRCode from "qrcode"
@@ -14,6 +14,7 @@ import { Html5Qrcode } from "html5-qrcode"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface Event {
   id: string
@@ -76,6 +77,8 @@ export default function EventDetailPage() {
   const [resourceDescription, setResourceDescription] = useState("")
   const [resourceFile, setResourceFile] = useState<File | null>(null)
   const [resourceType, setResourceType] = useState<string>("document")
+  const [eventResources, setEventResources] = useState<any[]>([])
+  const [isResourcesOpen, setIsResourcesOpen] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const supabase = createClient()
 
@@ -133,6 +136,7 @@ export default function EventDetailPage() {
   useEffect(() => {
     if (user && event) {
       setIsOrganizer(user.id === event.organizer_id)
+      fetchEventResources()
     }
   }, [user, event])
 
@@ -171,6 +175,9 @@ export default function EventDetailPage() {
     }
 
     setEvent(eventData)
+
+    console.log("📊 Event loaded:", eventData)
+    console.log("📎 Resources URL:", eventData.resources_url)
 
     // Fetch organizer profile
     const { data: profileData } = await supabase
@@ -223,6 +230,24 @@ export default function EventDetailPage() {
     }
 
     setIsLoading(false)
+  }
+
+  const fetchEventResources = async () => {
+    if (!event) return
+
+    const { data, error } = await supabase
+      .from('event_resources')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error("Error fetching resources:", error)
+      return
+    }
+
+    console.log("📦 Recursos cargados:", data)
+    setEventResources(data || [])
   }
 
   const fetchAttendees = async () => {
@@ -567,8 +592,9 @@ export default function EventDetailPage() {
       setShowResourceModal(false)
       alert("✅ Recurso subido exitosamente")
       
-      // Refresh event data
+      // Refresh event data and resources
       await fetchEvent()
+      await fetchEventResources()
 
     } catch (error) {
       console.error("Error:", error)
@@ -872,81 +898,6 @@ export default function EventDetailPage() {
               </Card>
             )}
 
-            {/* Resources Section - Only for registered users */}
-            {!isOrganizer && registration && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recursos del Evento</CardTitle>
-                  <CardDescription>
-                    Accede a los recursos una vez marcada tu asistencia
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {registration.is_attended && registration.attended_at ? (
-                    <>
-                      <Alert className="bg-green-500/10 border-green-500/20">
-                        <Check className="w-4 h-4 text-green-500" />
-                        <AlertDescription className="text-green-700 dark:text-green-400">
-                          ✓ Asistencia marcada el {new Date(registration.attended_at).toLocaleDateString('es-ES', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </AlertDescription>
-                      </Alert>
-                      
-                      {event.resources_url ? (
-                        <Link href={event.resources_url} target="_blank">
-                          <Button className="w-full gap-2" size="lg">
-                            <Download className="w-4 h-4" />
-                            Acceder a Recursos del Evento
-                          </Button>
-                        </Link>
-                      ) : (
-                        <Alert>
-                          <AlertDescription>
-                            No hay recursos disponibles para este evento.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {/* Button to see available courses */}
-                      <Link href="/courses">
-                        <Button className="w-full gap-2" size="lg" variant="outline">
-                          📚 Ver Recursos
-                        </Button>
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <Alert variant="default" className="bg-yellow-500/10 border-yellow-500/20">
-                        <Clock className="w-4 h-4 text-yellow-600" />
-                        <AlertDescription className="text-yellow-700 dark:text-yellow-400">
-                          ⏳ Pendiente de check-in. Muestra tu código QR en el evento para acceder a los recursos.
-                        </AlertDescription>
-                      </Alert>
-                      
-                      <Button 
-                        onClick={fetchEvent} 
-                        variant="outline" 
-                        className="w-full"
-                      >
-                        🔄 Actualizar Estado
-                      </Button>
-                      
-                      {event.resources_url && (
-                        <Button className="w-full" size="lg" disabled variant="outline">
-                          <Download className="w-4 h-4 mr-2" />
-                          Recursos disponibles después del check-in
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           {/* Sidebar */}
@@ -1066,7 +1017,7 @@ export default function EventDetailPage() {
             {/* Registration Card */}
             {!isOrganizer && (
               registration ? (
-                <Card>
+                <Card className="w-80">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Check className="w-5 h-5 text-green-500" />
@@ -1091,6 +1042,139 @@ export default function EventDetailPage() {
                     <p className="text-sm text-muted-foreground text-center">
                       Muestra este código QR en el evento para marcar asistencia
                     </p>
+
+                    {/* Resources Section - Right below QR */}
+                    <div className="border-t pt-4 mt-4">
+                      {registration.is_attended && registration.attended_at ? (
+                        <>
+                          <Alert className="bg-green-500/10 border-green-500/20 mb-4">
+                            <Check className="w-4 h-4 text-green-500" />
+                            <AlertDescription className="text-green-700 dark:text-green-400">
+                              ✓ Asistencia marcada el {new Date(registration.attended_at).toLocaleDateString('es-ES', { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </AlertDescription>
+                          </Alert>
+                          
+                          {/* Show event resources from event_resources table - Collapsible */}
+                          {eventResources.length > 0 ? (
+                            <Collapsible open={isResourcesOpen} onOpenChange={setIsResourcesOpen}>
+                              <CollapsibleTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  className="w-full justify-between mb-3"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <FileText className="w-4 h-4" />
+                                    Recursos del Evento ({eventResources.length})
+                                  </span>
+                                  <ChevronDown className={`w-4 h-4 transition-transform ${isResourcesOpen ? 'rotate-180' : ''}`} />
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="space-y-3">
+                                {eventResources.map((resource) => (
+                                  <div key={resource.id} className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-lg p-4">
+                                    <div className="flex items-start gap-3 mb-3">
+                                      <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                                        {resource.resource_type === 'pdf' || resource.file_name?.endsWith('.pdf') ? (
+                                          <FileText className="w-5 h-5 text-primary" />
+                                        ) : (
+                                          <Download className="w-5 h-5 text-primary" />
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-foreground mb-1">
+                                          {resource.title}
+                                        </h4>
+                                        {resource.description && (
+                                          <p className="text-sm text-muted-foreground mb-2">
+                                            {resource.description}
+                                          </p>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">
+                                          {resource.file_name} • {resource.resource_type === 'pdf' ? 'PDF' : resource.resource_type === 'zip' ? 'ZIP' : 'Documento'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <a 
+                                      href={resource.resource_url} 
+                                      download
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <Button className="w-full gap-2">
+                                        <Download className="w-4 h-4" />
+                                        Descargar
+                                      </Button>
+                                    </a>
+                                  </div>
+                                ))}
+                              </CollapsibleContent>
+                            </Collapsible>
+                          ) : (
+                            <Alert>
+                              <AlertDescription>
+                                No hay recursos disponibles para este evento.
+                              </AlertDescription>
+                            </Alert>
+                          )}
+
+                          {/* Button to see available courses - Simplified with gradient */}
+                          <Link href="/courses" className="block mt-4">
+                            <Button className="w-full gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+                              Ver Cursos Relacionados
+                            </Button>
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Alert variant="default" className="bg-yellow-500/10 border-yellow-500/20 mb-4">
+                            <Clock className="w-4 h-4 text-yellow-600" />
+                            <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+                              ⏳ Pendiente de check-in. Muestra tu código QR en el evento para acceder a los recursos.
+                            </AlertDescription>
+                          </Alert>
+                          
+                          <Button 
+                            onClick={fetchEvent} 
+                            variant="outline" 
+                            className="w-full mb-4"
+                          >
+                            🔄 Actualizar Estado
+                          </Button>
+                          
+                          {eventResources.length > 0 && (
+                            <div className="bg-muted/50 border border-border rounded-lg p-4">
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                                  <Download className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-foreground mb-1">
+                                    🔒 {eventResources.length} Recurso{eventResources.length > 1 ? 's' : ''} Bloqueado{eventResources.length > 1 ? 's' : ''}
+                                  </h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    Completa el check-in en el evento para acceder a los recursos
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                {eventResources.map((resource) => (
+                                  <div key={resource.id} className="flex items-center gap-2 text-sm text-muted-foreground p-2 bg-muted/30 rounded">
+                                    <FileText className="w-4 h-4" />
+                                    <span>{resource.title}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ) : (
