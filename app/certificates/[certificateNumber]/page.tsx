@@ -1,8 +1,8 @@
 import CertificateView from "@/components/certificates/certificate-view"
 import { createServiceClient } from "@/lib/supabase/service"
+import { getBaseUrl } from "@/lib/utils/url"
 import { notFound } from "next/navigation"
 import QRCode from "qrcode"
-import { getBaseUrl } from "@/lib/utils/url"
 
 interface CertificatePageProps {
   params: Promise<{
@@ -12,6 +12,7 @@ interface CertificatePageProps {
 
 export default async function CertificatePublicPage({ params }: CertificatePageProps) {
   const { certificateNumber } = await params
+  // Next.js expose runtime env vars but safe to fallback to base URL helper for server pages
 
   let supabaseClient: ReturnType<typeof createServiceClient> | null = null
   try {
