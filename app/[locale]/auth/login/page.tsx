@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { Link, useRouter } from "@/lib/i18n/routing"
 import { useTranslations } from "next-intl"
+import { useAuthStore } from "@/lib/store/auth-store"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const t = useTranslations('auth.login')
+  const { login } = useAuthStore()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,12 +28,29 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+      
       if (error) throw error
+      
+      if (data.user) {
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .single()
+
+        if (profile) {
+          // Update Zustand store
+          login(data.user, profile)
+        }
+      }
+      
       router.push("/dashboard")
+      router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : t('error'))
     } finally {

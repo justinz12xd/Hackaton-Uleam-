@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { ArrowLeft, Search, FileText, Image as ImageIcon, Download, Calendar, MapPin } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
 import { Badge } from "@/components/ui/badge"
+import { SkeletonCard } from "@/components/ui/skeleton"
 
 interface EventResource {
   id: string
@@ -258,9 +259,10 @@ export default function ResourcesPage() {
       {/* Resources Grid */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {isLoading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground mt-4">Cargando recursos...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

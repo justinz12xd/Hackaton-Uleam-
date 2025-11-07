@@ -6,6 +6,7 @@ import { setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/lib/i18n/routing';
 import { Navbar } from "@/components/navbar"
+import { AuthProvider } from "@/components/auth-provider"
 
 export const metadata: Metadata = {
   title: "EduCred - Microcredential Platform",
@@ -40,8 +41,10 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages} locale={locale}>
-      <Navbar />
-      {children}
+      <AuthProvider>
+        <Navbar />
+        {children}
+      </AuthProvider>
     </NextIntlClientProvider>
   );
 }

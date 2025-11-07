@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Award, ArrowRight, Briefcase as Certificate } from "lucide-react"
+import { BookOpen, Award, ArrowRight, Calendar } from "lucide-react"
 import { Link, redirect } from "@/lib/i18n/routing"
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
@@ -13,7 +13,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   const { locale } = await params
   setRequestLocale(locale)
   const t = await getTranslations('dashboard')
-  const tHome = await getTranslations('home.courses')
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getUser()
 
@@ -21,34 +20,47 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     redirect({ href: "/auth/login", locale })
   }
 
-  // Fetch user profile and enrolled courses
-  const [profileResponse, enrollmentsResponse] = await Promise.all([
+  // Fetch user profile and attended events
+  const [profileResponse, registrationsResponse] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", data.user.id).single(),
     supabase
-      .from("course_enrollments")
-      .select("*, course:courses(*)")
-      .eq("student_id", data.user.id)
+      .from("event_registrations")
+      .select("*")
+      .eq("user_id", data.user.id)
       .order("created_at", { ascending: false }),
   ])
 
   const profile = profileResponse.data
-  const enrollments = enrollmentsResponse.data || []
+  const registrationsData = registrationsResponse.data || []
 
-  // Fetch recommended courses (published courses not enrolled by user)
-  const enrolledCourseIds = enrollments.map((e) => e.course?.id).filter(Boolean)
-  
-  let recommendedQuery = supabase
-    .from("courses")
+  // Get event details for each registration
+  const eventIds = registrationsData.map((r: any) => r.event_id).filter(Boolean)
+  const { data: eventsData } = await supabase
+    .from("events")
     .select("*")
-    .eq("is_published", true)
-    .order("created_at", { ascending: false })
+    .in("id", eventIds)
+
+  // Merge registrations with events
+  const registrations = registrationsData.map((reg: any) => ({
+    ...reg,
+    event: eventsData?.find((e: any) => e.id === reg.event_id)
+  }))
+
+  // Fetch upcoming events (events not registered by user)
+  const registeredEventIds = registrations.map((r) => r.event?.id).filter(Boolean)
+  
+  let upcomingQuery = supabase
+    .from("events")
+    .select("*")
+    .gte("event_date", new Date().toISOString())
+    .order("event_date", { ascending: true })
     .limit(6)
   
-  const { data: allRecommendedCourses } = await recommendedQuery
+  const { data: allUpcomingEvents } = await upcomingQuery
   
-  // Filter out enrolled courses on the client side
-  const recommended = (allRecommendedCourses || [])
-    .filter((course) => !enrolledCourseIds.includes(course.id))
+  // Filter out registered events on the client side
+  const recommended = (allUpcomingEvents || [])
+    .filter((event) => !registeredEventIds.includes(event.id))
     .slice(0, 3)
 
   return (
@@ -62,12 +74,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
               <p className="text-muted-foreground mt-2">{t('continueLearning')}</p>
             </div>
             <div className="flex gap-2">
-              <Link href="/dashboard/certificates">
-                <Button variant="outline" className="gap-2 bg-transparent">
-                  <Certificate className="w-4 h-4" />
-                  {t('certificates')}
-                </Button>
-              </Link>
               <Link href="/dashboard/profile">
                 <Button variant="outline">{t('myProfile')}</Button>
               </Link>
@@ -82,72 +88,65 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t('enrolledCourses')}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t('attendedEvents')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">{enrollments.length}</div>
+              <div className="text-3xl font-bold text-foreground">{registrations.filter((r) => r.is_attended).length}</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t('certificatesEarned')}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t('registeredEvents')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">
-                {enrollments.filter((e) => e.completed_at).length}
+                {registrations.length}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t('learningStreak')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">7 days</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Enrolled Courses */}
+        {/* Registered Events */}
         <div>
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground mb-2">{t('yourCourses')}</h2>
-            <p className="text-muted-foreground">{t('manageCourses')}</p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">{t('yourEvents')}</h2>
+            <p className="text-muted-foreground">{t('manageEvents')}</p>
           </div>
 
-          {enrollments.length > 0 ? (
+          {registrations.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {enrollments.map((enrollment) => (
-                <Card key={enrollment.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              {registrations.map((registration) => (
+                <Card key={registration.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                   <div className="bg-gradient-to-br from-primary/20 to-accent/20 h-32" />
                   <CardHeader>
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
-                        {enrollment.course?.difficulty_level || "Beginner"}
+                        {new Date(registration.event?.event_date || '').toLocaleDateString()}
                       </span>
-                      {enrollment.completed_at && <Award className="w-4 h-4 text-accent" />}
+                      {registration.is_attended && <Award className="w-4 h-4 text-accent" />}
                     </div>
-                    <CardTitle className="line-clamp-2">{enrollment.course?.title}</CardTitle>
-                    <CardDescription className="line-clamp-2">{enrollment.course?.description}</CardDescription>
+                    <CardTitle className="line-clamp-2">{registration.event?.title}</CardTitle>
+                    <CardDescription className="line-clamp-2">{registration.event?.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-xs mb-2">
-                        <span className="text-muted-foreground">{t('progress')}</span>
-                        <span className="font-semibold">{enrollment.progress_percentage || 0}%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all"
-                          style={{ width: `${enrollment.progress_percentage || 0}%` }}
-                        />
-                      </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>{registration.event?.location}</span>
                     </div>
-                    <Link href={`/courses/${enrollment.course?.id}/learn`}>
+                    <div className="flex items-center gap-2">
+                      {registration.is_attended ? (
+                        <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+                          {t('attended')}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                          {t('registered')}
+                        </span>
+                      )}
+                    </div>
+                    <Link href={`/events/${registration.event?.id}`}>
                       <Button className="w-full" size="sm">
-                        {t('continueLearning')}
+                        {t('viewEvent')}
                       </Button>
                     </Link>
                   </CardContent>
@@ -158,10 +157,10 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             <Card className="text-center py-12">
               <CardContent className="space-y-4">
                 <BookOpen className="w-12 h-12 text-muted-foreground mx-auto" />
-                <p className="text-muted-foreground">{t('noCourses')}</p>
-                <Link href="/courses">
+                <p className="text-muted-foreground">{t('noEvents')}</p>
+                <Link href="/events">
                   <Button className="gap-2">
-                    {t('browseCourses')} <ArrowRight className="w-4 h-4" />
+                    {t('browseEvents')} <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>
               </CardContent>
@@ -172,27 +171,30 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         {/* Recommended Section */}
         <div className="mt-16">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground mb-2">{t('recommended')}</h2>
-            <p className="text-muted-foreground">{t('recommendedDescription')}</p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">{t('upcomingEvents')}</h2>
+            <p className="text-muted-foreground">{t('upcomingEventsDescription')}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recommended.length > 0 ? (
-              recommended.map((course) => (
-                <Card key={course.id} className="hover:shadow-lg transition-shadow">
+              recommended.map((event) => (
+                <Card key={event.id} className="hover:shadow-lg transition-shadow">
                   <div className="bg-gradient-to-br from-secondary/20 to-primary/20 h-32" />
                   <CardHeader>
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-xs font-semibold text-accent bg-accent/10 px-2 py-1 rounded capitalize">
-                        {course.difficulty_level || tHome('levels.beginner')}
+                      <span className="text-xs font-semibold text-accent bg-accent/10 px-2 py-1 rounded">
+                        {new Date(event.event_date).toLocaleDateString()}
                       </span>
-                      <span className="text-xs text-muted-foreground">{course.duration_hours || 0} {tHome('hours')}</span>
+                      <span className="text-xs text-muted-foreground">{event.max_attendees} {t('spots')}</span>
                     </div>
-                    <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                    <CardDescription className="line-clamp-2">{course.description}</CardDescription>
+                    <CardTitle className="line-clamp-2">{event.title}</CardTitle>
+                    <CardDescription className="line-clamp-2">{event.description}</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <Link href={`/courses/${course.id}`}>
+                  <CardContent className="space-y-2">
+                    <div className="text-sm text-muted-foreground">
+                      📍 {event.location}
+                    </div>
+                    <Link href={`/events/${event.id}`}>
                       <Button variant="outline" className="w-full bg-transparent" size="sm">
                         {t('viewDetails')}
                       </Button>
@@ -202,7 +204,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
               ))
             ) : (
               <div className="col-span-full text-center py-12">
-                <p className="text-muted-foreground">{t('noRecommendedCourses')}</p>
+                <p className="text-muted-foreground">{t('noUpcomingEvents')}</p>
               </div>
             )}
           </div>
