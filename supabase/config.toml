@@ -1,0 +1,7 @@
+project_id = "ktnmcvqkyukeiuzeuubi"
+
+[api]
+port = 54321
+
+[db]
+shadow_port = 54322
