@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       } catch (emailError) {
         console.warn("No se pudo enviar el correo del certificado", emailError)
       }
-    }
+    }  
 
     return NextResponse.json({
       success: true,
