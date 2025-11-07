@@ -20,7 +20,14 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { Search, Award, User, Calendar, ExternalLink } from "lucide-react"
+import {
+  Calendar,
+  CheckCircle,
+  ExternalLink,
+  MapPin,
+  Search,
+  Users,
+} from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,11 +40,13 @@ interface UserProfile {
   avatar_url: string | null
 }
 
-interface Certificate {
+interface AttendedEvent {
   id: string
-  course_title: string
-  issued_at: string
-  certificate_url: string
+  event_title: string
+  event_date: string
+  location: string
+  attended_at: string
+  is_collaborator: boolean
 }
 
 export function UserSearch() {
@@ -45,9 +54,9 @@ export function UserSearch() {
   const [searchQuery, setSearchQuery] = useState("")
   const [users, setUsers] = useState<UserProfile[]>([])
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null)
-  const [certificates, setCertificates] = useState<Certificate[]>([])
+  const [events, setEvents] = useState<AttendedEvent[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
-  const [isLoadingCertificates, setIsLoadingCertificates] = useState(false)
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false)
 
   const supabase = createClient()
 
@@ -73,34 +82,42 @@ export function UserSearch() {
     setIsLoadingUsers(false)
   }
 
-  const loadUserCertificates = async (userId: string) => {
-    setIsLoadingCertificates(true)
+  const loadUserEvents = async (userId: string) => {
+    setIsLoadingEvents(true)
     const { data, error } = await supabase
-      .from("certificates")
+      .from("event_registrations")
       .select(`
         id,
-        issued_at,
-        certificate_url,
-        courses!inner(title)
+        attended_at,
+        is_collaborator,
+        events!inner(
+          id,
+          title,
+          event_date,
+          location
+        )
       `)
       .eq("user_id", userId)
-      .order("issued_at", { ascending: false })
+      .eq("is_attended", true)
+      .order("attended_at", { ascending: false })
 
     if (!error && data) {
-      const formattedCertificates = data.map((cert: any) => ({
-        id: cert.id,
-        course_title: cert.courses.title,
-        issued_at: cert.issued_at,
-        certificate_url: cert.certificate_url,
+      const formattedEvents = data.map((reg: any) => ({
+        id: reg.id,
+        event_title: reg.events.title,
+        event_date: reg.events.event_date,
+        location: reg.events.location,
+        attended_at: reg.attended_at,
+        is_collaborator: reg.is_collaborator,
       }))
-      setCertificates(formattedCertificates)
+      setEvents(formattedEvents)
     }
-    setIsLoadingCertificates(false)
+    setIsLoadingEvents(false)
   }
 
   const handleSelectUser = (user: UserProfile) => {
     setSelectedUser(user)
-    loadUserCertificates(user.id)
+    loadUserEvents(user.id)
   }
 
   const formatDate = (dateString: string) => {
@@ -221,56 +238,58 @@ export function UserSearch() {
                     size="sm"
                     onClick={() => {
                       setSelectedUser(null)
-                      setCertificates([])
+                      setEvents([])
                     }}
                   >
                     Back
                   </Button>
                 </div>
 
-                {/* Certificates */}
+                {/* Events */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <Award className="w-5 h-5 text-primary" />
+                    <Calendar className="w-5 h-5 text-primary" />
                     <h4 className="font-semibold">
-                      Microcredentials ({certificates.length})
+                      Eventos Asistidos ({events.length})
                     </h4>
                   </div>
 
-                  {isLoadingCertificates ? (
+                  {isLoadingEvents ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      Loading certificates...
+                      Cargando eventos...
                     </div>
-                  ) : certificates.length > 0 ? (
+                  ) : events.length > 0 ? (
                     <div className="space-y-3">
-                      {certificates.map((cert) => (
-                        <Card key={cert.id}>
+                      {events.map((event: AttendedEvent) => (
+                        <Card key={event.id}>
                           <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-start justify-between">
-                              <span className="flex-1">{cert.course_title}</span>
+                              <span className="flex-1">{event.event_title}</span>
                               <Badge variant="secondary" className="ml-2">
-                                <Award className="w-3 h-3 mr-1" />
-                                Earned
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Asistió
                               </Badge>
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-2">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Calendar className="w-4 h-4" />
-                              <span>{formatDate(cert.issued_at)}</span>
+                              <span>{formatDate(event.event_date)}</span>
                             </div>
-                            {cert.certificate_url && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full"
-                                onClick={() =>
-                                  window.open(cert.certificate_url, "_blank")
-                                }
-                              >
-                                <ExternalLink className="w-4 h-4 mr-2" />
-                                View Certificate
-                              </Button>
+                            {event.location && (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <MapPin className="w-4 h-4" />
+                                <span>{event.location}</span>
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground pt-1">
+                              Asistió: {formatDate(event.attended_at)}
+                            </div>
+                            {event.is_collaborator && (
+                              <Badge variant="outline" className="mt-2">
+                                <Users className="w-3 h-3 mr-1" />
+                                Colaborador
+                              </Badge>
                             )}
                           </CardContent>
                         </Card>
@@ -279,8 +298,8 @@ export function UserSearch() {
                   ) : (
                     <Card>
                       <CardContent className="py-8 text-center text-muted-foreground">
-                        <Award className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No microcredentials earned yet</p>
+                        <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No ha asistido a ningún evento aún</p>
                       </CardContent>
                     </Card>
                   )}

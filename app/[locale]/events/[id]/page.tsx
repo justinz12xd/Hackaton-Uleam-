@@ -705,6 +705,13 @@ export default function EventDetailPage() {
                           </AlertDescription>
                         </Alert>
                       )}
+
+                      {/* Button to see available courses */}
+                      <Link href="/courses">
+                        <Button className="w-full gap-2" size="lg" variant="outline">
+                          📚 Ver Recursos
+                        </Button>
+                      </Link>
                     </>
                   ) : (
                     <>
