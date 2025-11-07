@@ -88,7 +88,8 @@ export default function SignupPage() {
         }
       }
       
-      router.push("/auth/signup-success")
+      // Redirigir directamente a eventos después del registro exitoso
+      router.push("/events")
       router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : t('error'))

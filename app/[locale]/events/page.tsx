@@ -75,17 +75,26 @@ export default async function EventsPage() {
   return (
     <main className="min-h-screen bg-background">
       {/* Hero Section */}
-      <div className="border-b border-border">
+      <div className="border-b border-border bg-gradient-to-b from-muted/30 to-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          {/* Greeting - Only for authenticated users */}
+          {user && userProfile && (
+            <div className="mb-6">
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+                Hola, {userProfile.full_name?.split(' ')[0] || 'Usuario'} 👋
+              </h2>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <h1 className="text-5xl font-bold mb-2">
+              <h1 className="text-4xl sm:text-5xl font-bold mb-2">
                 <RotatingText 
                   words={['Gestiona', 'Asiste a ', 'Crea', 'Accede a', 'Participa en']} 
                   staticText="Eventos"
                 />
               </h1>
-              <p className="text-muted-foreground text-lg">
+              <p className="text-muted-foreground text-base sm:text-lg">
                 {userProfile?.role === 'instructor' || userProfile?.role === 'admin'
                   ? 'Crea y gestiona eventos para tu comunidad'
                   : 'Descubre y participa en eventos relevantes para tu aprendizaje'}
@@ -96,7 +105,7 @@ export default async function EventsPage() {
             {(userProfile?.role === 'instructor' || userProfile?.role === 'admin') && (
               <div className="shrink-0">
                 <Link href="/events/create">
-                  <Button size="lg" className="gap-2">
+                  <Button size="lg" className="gap-2 shadow-lg hover:shadow-xl transition-shadow">
                     <Plus className="h-5 w-5" />
                     {t('createEvent')}
                   </Button>
