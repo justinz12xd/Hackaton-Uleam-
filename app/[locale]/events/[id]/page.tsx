@@ -68,6 +68,8 @@ export default function EventDetailPage() {
   const [organizerProfile, setOrganizerProfile] = useState<OrganizerProfile | null>(null)
   const [isCollaborator, setIsCollaborator] = useState(false)
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [attendees, setAttendees] = useState<any[]>([])
+  const [showAttendeesList, setShowAttendeesList] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const supabase = createClient()
 
@@ -75,6 +77,42 @@ export default function EventDetailPage() {
     checkUser()
     fetchEvent()
   }, [params.id])
+
+  // Realtime subscription for registration updates
+  useEffect(() => {
+    if (!event || !user) return
+
+    const channel = supabase
+      .channel(`event-${event.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'event_registrations',
+          filter: `event_id=eq.${event.id}`,
+        },
+        (payload) => {
+          console.log('Registration updated:', payload)
+          
+          // If it's the current user's registration, update state
+          if (payload.new.user_id === user.id) {
+            setRegistration(payload.new as Registration)
+            console.log('Current user registration updated in realtime')
+          }
+          
+          // Refresh attendees list if organizer
+          if (isOrganizer) {
+            fetchAttendees()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [event, user, isOrganizer])
 
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -91,6 +129,13 @@ export default function EventDetailPage() {
       setIsOrganizer(user.id === event.organizer_id)
     }
   }, [user, event])
+
+  // Fetch attendees when user is organizer
+  useEffect(() => {
+    if (isOrganizer && event) {
+      fetchAttendees()
+    }
+  }, [isOrganizer, event])
 
   // Start scanner when dialog opens
   useEffect(() => {
@@ -159,7 +204,7 @@ export default function EventDetailPage() {
         .select("*")
         .eq("event_id", params.id)
         .eq("user_id", user.id)
-        .single()
+        .maybeSingle() // Use maybeSingle() instead of single() to avoid error when no record found
 
       if (regData) {
         console.log("User registration data:", regData)
@@ -168,9 +213,75 @@ export default function EventDetailPage() {
       } else if (regError) {
         console.error("Error fetching registration:", regError)
       }
+      // If regData is null and no error, user is simply not registered (which is fine)
     }
 
     setIsLoading(false)
+  }
+
+  const fetchAttendees = async () => {
+    if (!event) return
+
+    try {
+      // Get all registrations for this event
+      const { data: registrations, error: regError } = await supabase
+        .from("event_registrations")
+        .select("id, user_id, is_attended, attended_at, is_collaborator, registered_at")
+        .eq("event_id", event.id)
+        .order("registered_at", { ascending: true })
+
+      if (regError) {
+        console.error("Error fetching registrations:", regError)
+        return
+      }
+
+      if (!registrations || registrations.length === 0) {
+        setAttendees([])
+        return
+      }
+
+      // Get user profiles for all registrations
+      const userIds = registrations.map(r => r.user_id)
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", userIds)
+
+      if (profileError) {
+        console.error("Error fetching profiles:", profileError)
+      }
+
+      // Merge registrations with profiles
+      const attendeesWithProfiles = registrations.map(reg => ({
+        ...reg,
+        profiles: profiles?.find(p => p.id === reg.user_id) || null
+      }))
+
+      setAttendees(attendeesWithProfiles)
+    } catch (error) {
+      console.error("Error in fetchAttendees:", error)
+    }
+  }
+
+  const toggleAttendance = async (registrationId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus
+    
+    const { error } = await supabase
+      .from("event_registrations")
+      .update({
+        is_attended: newStatus,
+        attended_at: newStatus ? new Date().toISOString() : null,
+      })
+      .eq("id", registrationId)
+
+    if (error) {
+      console.error("Error updating attendance:", error)
+      alert("Error al actualizar asistencia")
+      return
+    }
+
+    // Refresh attendees list
+    fetchAttendees()
   }
 
   const generateQR = async (qrCode: string) => {
@@ -630,27 +741,91 @@ export default function EventDetailPage() {
           <div className="space-y-6">
             {/* Organizer Scanner */}
             {isOrganizer && (
-              <Card className="border-primary">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Camera className="w-5 h-5" />
-                    Escanear QR (Organizador)
-                  </CardTitle>
-                  <CardDescription>
-                    Escanea los códigos QR de los asistentes
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    onClick={openScanner}
-                    className="w-full gap-2"
-                    variant="default"
-                  >
-                    <Camera className="w-4 h-4" />
-                    Activar Cámara
-                  </Button>
-                </CardContent>
-              </Card>
+              <>
+                <Card className="border-primary">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Camera className="w-5 h-5" />
+                      Escanear QR (Organizador)
+                    </CardTitle>
+                    <CardDescription>
+                      Escanea los códigos QR de los asistentes
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      onClick={openScanner}
+                      className="w-full gap-2"
+                      variant="default"
+                    >
+                      <Camera className="w-4 h-4" />
+                      Activar Cámara
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Attendees List */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <Users className="w-5 h-5" />
+                        Lista de Asistentes
+                      </span>
+                      <Badge variant="secondary">{attendees.length}</Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      Gestiona la asistencia de forma manual
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {attendees.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No hay registros aún
+                        </p>
+                      ) : (
+                        attendees.map((attendee) => (
+                          <div
+                            key={attendee.id}
+                            className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {attendee.profiles?.full_name || attendee.profiles?.email || "Usuario"}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                {attendee.is_collaborator && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Colaborador
+                                  </Badge>
+                                )}
+                                {attendee.is_attended ? (
+                                  <Badge variant="default" className="text-xs bg-green-500">
+                                    ✓ Asistió
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    Pendiente
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant={attendee.is_attended ? "outline" : "default"}
+                              onClick={() => toggleAttendance(attendee.id, attendee.is_attended)}
+                              className="ml-2"
+                            >
+                              {attendee.is_attended ? "Desmarcar" : "Marcar"}
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             )}
 
             {/* Registration Card */}
