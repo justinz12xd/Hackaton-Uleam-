@@ -76,16 +76,7 @@ export default async function EventsPage() {
               </h1>
               
             </div>
-            {user && (
-              <div className="flex gap-3">
-                <Link href="/events/create">
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    {t('createEvent')}
-                  </Button>
-                </Link>
-              </div>
-            )}
+
           </div>
         </div>
       </div>
