@@ -78,10 +78,8 @@ export default function LoginPage() {
         // Establecer isLoading en false
         setIsLoading(false)
 
-        // Redirigir según el rol del usuario
-        const redirectPath = profile?.role === 'admin' || profile?.role === 'instructor' 
-          ? '/instructor' 
-          : '/dashboard'
+        // Redirigir directamente a eventos para todos los usuarios
+        const redirectPath = '/events'
         
         // Usar window.location para una redirección completa que actualice todo
         const currentPath = window.location.pathname
