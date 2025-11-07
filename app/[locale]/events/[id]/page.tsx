@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, MapPin, Users, Clock, ArrowLeft, Check, Download, Camera, X } from "lucide-react"
+import { Calendar, MapPin, Users, Clock, ArrowLeft, Check, Download, Camera, X, Upload, FileText, Image as ImageIcon } from "lucide-react"
 import { Link, useRouter } from "@/lib/i18n/routing"
 import { useParams } from "next/navigation"
 import QRCode from "qrcode"
@@ -70,6 +70,12 @@ export default function EventDetailPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [attendees, setAttendees] = useState<any[]>([])
   const [showAttendeesList, setShowAttendeesList] = useState(false)
+  const [showResourceModal, setShowResourceModal] = useState(false)
+  const [isUploadingResource, setIsUploadingResource] = useState(false)
+  const [resourceTitle, setResourceTitle] = useState("")
+  const [resourceDescription, setResourceDescription] = useState("")
+  const [resourceFile, setResourceFile] = useState<File | null>(null)
+  const [resourceType, setResourceType] = useState<string>("document")
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const supabase = createClient()
 
@@ -484,6 +490,100 @@ export default function EventDetailPage() {
     })
   }
 
+  const handleResourceUpload = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!resourceFile || !resourceTitle || !user || !event) {
+      alert("Por favor completa todos los campos requeridos")
+      return
+    }
+
+    setIsUploadingResource(true)
+
+    try {
+      // Determine resource type based on file extension
+      const fileExtension = resourceFile.name.split('.').pop()?.toLowerCase()
+      let detectedType = resourceType
+      
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '')) {
+        detectedType = 'photo'
+      } else if (fileExtension === 'pdf') {
+        detectedType = 'pdf'
+      } else {
+        detectedType = 'document'
+      }
+
+      // Upload file to Supabase Storage
+      // Sanitize filename to avoid special characters
+      const sanitizedFileName = resourceFile.name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .replace(/[^\w\s.-]/g, "") // Remove special chars except . - and spaces
+        .replace(/\s+/g, "_") // Replace spaces with underscores
+      
+      const fileName = `${event.id}/${Date.now()}-${sanitizedFileName}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('Recursos-Eventos')
+        .upload(fileName, resourceFile, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError)
+        alert("Error al subir el archivo: " + uploadError.message)
+        return
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('Recursos-Eventos')
+        .getPublicUrl(fileName)
+
+      // Save resource metadata to database
+      const { error: dbError } = await supabase
+        .from('event_resources')
+        .insert({
+          event_id: event.id,
+          title: resourceTitle,
+          description: resourceDescription,
+          resource_url: publicUrl,
+          resource_type: detectedType,
+          file_name: resourceFile.name,
+          file_size: resourceFile.size,
+          uploaded_by: user.id
+        })
+
+      if (dbError) {
+        console.error("Database error:", dbError)
+        alert("Error al guardar el recurso: " + dbError.message)
+        return
+      }
+
+      // Reset form and close modal
+      setResourceTitle("")
+      setResourceDescription("")
+      setResourceFile(null)
+      setShowResourceModal(false)
+      alert("✅ Recurso subido exitosamente")
+      
+      // Refresh event data
+      await fetchEvent()
+
+    } catch (error) {
+      console.error("Error:", error)
+      alert("Error inesperado al subir el recurso")
+    } finally {
+      setIsUploadingResource(false)
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setResourceFile(e.target.files[0])
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -547,6 +647,112 @@ export default function EventDetailPage() {
               Coloca el código QR frente a la cámara
             </p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resource Upload Modal */}
+      <Dialog open={showResourceModal} onOpenChange={setShowResourceModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" />
+              Añadir Recurso del Evento
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleResourceUpload} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="resourceTitle">Título del Recurso *</Label>
+              <input
+                id="resourceTitle"
+                type="text"
+                value={resourceTitle}
+                onChange={(e) => setResourceTitle(e.target.value)}
+                placeholder="Ej: Presentación del taller"
+                className="w-full px-3 py-2 border rounded-md"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="resourceDescription">Descripción</Label>
+              <textarea
+                id="resourceDescription"
+                value={resourceDescription}
+                onChange={(e) => setResourceDescription(e.target.value)}
+                placeholder="Describe el recurso (opcional)"
+                className="w-full px-3 py-2 border rounded-md min-h-[80px]"
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="resourceType">Tipo de Recurso</Label>
+              <select
+                id="resourceType"
+                value={resourceType}
+                onChange={(e) => setResourceType(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+              >
+                <option value="document">Documento</option>
+                <option value="pdf">PDF</option>
+                <option value="photo">Foto</option>
+                <option value="other">Otro</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="resourceFile">Archivo *</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="resourceFile"
+                  type="file"
+                  onChange={handleFileChange}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                  className="w-full px-3 py-2 border rounded-md"
+                  required
+                />
+              </div>
+              {resourceFile && (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  {resourceFile.name} ({(resourceFile.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowResourceModal(false)
+                  setResourceTitle("")
+                  setResourceDescription("")
+                  setResourceFile(null)
+                }}
+                disabled={isUploadingResource}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isUploadingResource}
+                className="gap-2"
+              >
+                {isUploadingResource ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Subiendo...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Subir Recurso
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -766,6 +972,29 @@ export default function EventDetailPage() {
                     >
                       <Camera className="w-4 h-4" />
                       Activar Cámara
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Add Resources */}
+                <Card className="border-primary">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Upload className="w-5 h-5" />
+                      Recursos del Evento
+                    </CardTitle>
+                    <CardDescription>
+                      Sube materiales y recursos para los asistentes
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      onClick={() => setShowResourceModal(true)}
+                      className="w-full gap-2"
+                      variant="secondary"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Añadir Recursos
                     </Button>
                   </CardContent>
                 </Card>
