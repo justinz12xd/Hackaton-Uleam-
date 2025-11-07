@@ -34,25 +34,59 @@ export default async function LearnPage({ params }: LearnPageProps) {
     redirect({ href: '/courses', locale })
   }
 
-  // Verificar que el estudiante esté inscrito
-  const { data: enrollment } = await supabase
-    .from('course_enrollments')
-    .select('id')
+  // NUEVO: Verificar si este curso está asociado a un evento
+  const { data: associatedEvent } = await supabase
+    .from('events')
+    .select('id, title, status')
     .eq('course_id', id)
-    .eq('student_id', user.id)
-    .single()
+    .maybeSingle()
 
-  const isEnrolled = !!enrollment
+  let hasAccess = false
+  let accessMessage = ''
 
-  // Si no está inscrito, redirigir a la página del curso
-  if (!isEnrolled) {
+  if (associatedEvent) {
+    // Este curso pertenece a un evento - verificar asistencia
+    const { data: registration } = await supabase
+      .from('event_registrations')
+      .select('is_attended, attended_at')
+      .eq('event_id', associatedEvent.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (registration?.is_attended) {
+      hasAccess = true
+      accessMessage = 'event_validated'
+    } else if (registration) {
+      accessMessage = 'event_not_attended'
+    } else {
+      accessMessage = 'not_registered_to_event'
+    }
+  } else {
+    // Curso tradicional - verificar inscripción
+    const { data: enrollment } = await supabase
+      .from('course_enrollments')
+      .select('id')
+      .eq('course_id', id)
+      .eq('student_id', user.id)
+      .maybeSingle()
+
+    if (enrollment) {
+      hasAccess = true
+      accessMessage = 'enrolled'
+    } else {
+      accessMessage = 'not_enrolled'
+    }
+  }
+
+  // Si no tiene acceso, redirigir
+  if (!hasAccess) {
     redirect({ href: `/courses/${id}`, locale })
   }
 
   // Parsear el contenido JSON
   let courseContent: CourseContent | null = null
   try {
-    if (course.content) {
+    if (course?.content) {
       courseContent = typeof course.content === 'string' 
         ? JSON.parse(course.content) 
         : course.content
@@ -60,6 +94,10 @@ export default async function LearnPage({ params }: LearnPageProps) {
   } catch (error) {
     console.error('Error parsing course content:', error)
   }
+
+  // Garantizar que course y user no son null después de las validaciones
+  const safeCourse = course!
+  const safeUser = user!
 
   return (
     <main className="min-h-screen bg-background">
@@ -73,9 +111,9 @@ export default async function LearnPage({ params }: LearnPageProps) {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">{course.title}</h1>
-            {course.description && (
-              <p className="text-muted-foreground mt-2 line-clamp-2">{course.description}</p>
+            <h1 className="text-3xl font-bold text-foreground">{safeCourse.title}</h1>
+            {safeCourse.description && (
+              <p className="text-muted-foreground mt-2 line-clamp-2">{safeCourse.description}</p>
             )}
           </div>
         </div>
@@ -85,9 +123,9 @@ export default async function LearnPage({ params }: LearnPageProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <CourseViewer
           courseId={id}
-          courseTitle={course.title}
+          courseTitle={safeCourse.title}
           content={courseContent}
-          isEnrolled={isEnrolled}
+          isEnrolled={hasAccess}
         />
       </div>
     </main>

@@ -48,8 +48,20 @@ export default function CreateCoursePage() {
     setError(null)
 
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) throw new Error("Not authenticated")
+      const { data: userData, error: authError } = await supabase.auth.getUser()
+      
+      if (authError || !userData.user) {
+        throw new Error("No estás autenticado. Por favor inicia sesión.")
+      }
+
+      console.log("Creating course with data:", {
+        instructor_id: userData.user.id,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        difficulty_level: formData.difficulty_level,
+        duration_hours: Number.parseInt(formData.duration_hours),
+      })
 
       const { data, error: insertError } = await supabase
         .from("courses")
@@ -62,16 +74,22 @@ export default function CreateCoursePage() {
             difficulty_level: formData.difficulty_level,
             duration_hours: Number.parseInt(formData.duration_hours),
             is_published: false,
+            content: { modules: [] }, // Agregar contenido vacío por defecto
           },
         ])
         .select()
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error("Insert error:", insertError)
+        throw new Error(`Error al crear el curso: ${insertError.message}`)
+      }
 
+      console.log("Course created successfully:", data)
       router.push("/instructor")
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      console.error("Error completo:", err)
+      setError(err instanceof Error ? err.message : "Ocurrió un error desconocido")
     } finally {
       setIsLoading(false)
     }
