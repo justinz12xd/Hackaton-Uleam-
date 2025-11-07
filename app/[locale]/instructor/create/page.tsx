@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useRouter as useI18nRouter } from "@/lib/i18n/routing"
@@ -16,7 +16,7 @@ import { ArrowLeft } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-export default function CreateCoursePage() {
+function CreateCoursePageContent() {
   const searchParams = useSearchParams()
   const eventId = searchParams.get('eventId')
   const [event, setEvent] = useState<any>(null)
@@ -270,6 +270,20 @@ export default function CreateCoursePage() {
         </Card>
       </div>
     </main>
+  )
+}
+
+export default function CreateCoursePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-sm text-muted-foreground">Cargando formulario…</div>
+        </main>
+      }
+    >
+      <CreateCoursePageContent />
+    </Suspense>
   )
 }
 
