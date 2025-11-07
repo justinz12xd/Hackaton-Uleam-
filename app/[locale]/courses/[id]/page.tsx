@@ -17,14 +17,19 @@ export default async function CoursePage({ params }: CoursePageProps) {
 
   const { data: user } = await supabase.auth.getUser()
 
-  // Fetch course details
-  const courseResponse = await supabase.from("courses").select("*").eq("id", id).single()
+  // Fetch course details with instructor information
+  const courseResponse = await supabase
+    .from("courses")
+    .select("*, instructor:profiles!instructor_id(full_name)")
+    .eq("id", id)
+    .single()
 
   if (!courseResponse.data) {
     redirect('/courses')
   }
 
   const course = courseResponse.data
+  const instructor = course.instructor as { full_name: string } | null
 
   // Check if user is enrolled
   const enrollmentResponse = await supabase
@@ -134,7 +139,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
                 <div className="space-y-2 text-sm text-muted-foreground border-t pt-4">
                   <p>Duration: {course.duration_hours} hours</p>
                   <p>Level: {course.difficulty}</p>
-                  <p>Instructor: {course.instructor_id}</p>
+                  <p>Instructor: {instructor?.full_name || "Unknown"}</p>
                 </div>
               </CardContent>
             </Card>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { UserSearch } from "@/components/user-search"
 import { useTranslations } from "next-intl"
 import { Link } from "@/lib/i18n/routing"
 
@@ -59,6 +60,7 @@ export function Navbar() {
         <div className="flex gap-4 items-center">
           {user ? (
             <>
+              <UserSearch />
               <Link href="/courses">
                 <Button variant="ghost">{t('courses')}</Button>
               </Link>
@@ -78,6 +80,7 @@ export function Navbar() {
             </>
           ) : (
             <>
+              <UserSearch />
               <Link href="/courses">
                 <Button variant="ghost">{t('browseCourses')}</Button>
               </Link>
