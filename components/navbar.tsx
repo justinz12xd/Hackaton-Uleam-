@@ -54,12 +54,15 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <Link href="/" className="text-2xl font-bold text-primary">
+        <Link href="/events" className="text-2xl font-bold text-primary">
           EduCred
         </Link>
         <div className="flex gap-4 items-center">
           {user ? (
             <>
+              <Link href="/events">
+                <Button variant="ghost">Events</Button>
+              </Link>
               <UserSearch />
               <Link href="/courses">
                 <Button variant="ghost">{t('courses')}</Button>
@@ -80,6 +83,9 @@ export function Navbar() {
             </>
           ) : (
             <>
+              <Link href="/events">
+                <Button variant="ghost">Events</Button>
+              </Link>
               <UserSearch />
               <Link href="/courses">
                 <Button variant="ghost">{t('browseCourses')}</Button>
