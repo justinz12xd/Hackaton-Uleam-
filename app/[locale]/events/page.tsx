@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button"
 import { Calendar, Plus } from "lucide-react"
 import { Link } from "@/lib/i18n/routing"
 import { EventsClient } from "./events-client"
+import { RotatingText } from "@/components/rotating-text"
+import { EventsCarousel } from "@/components/events-carousel"
 import { getTranslations } from "next-intl/server"
 
 export default async function EventsPage() {
@@ -63,18 +65,16 @@ export default async function EventsPage() {
     <main className="min-h-screen bg-background">
       {/* Hero Section */}
       <div className="border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <h1 className="text-5xl font-bold mb-2">{t('title')}</h1>
-              <div className="flex gap-4 mt-6">
-                <Button variant="ghost" className="hover:bg-accent">
-                  {t('upcoming')}
-                </Button>
-                <Button variant="ghost" className="text-muted-foreground hover:bg-accent hover:text-foreground">
-                  {t('past')}
-                </Button>
-              </div>
+              <h1 className="text-5xl font-bold mb-2">
+                <RotatingText 
+                  words={['Gestiona', 'Asiste a ', 'Crea', 'Accede a', 'Participa en']} 
+                  staticText="Eventos"
+                />
+              </h1>
+              
             </div>
             {user && (
               <div className="flex gap-3">
@@ -89,6 +89,9 @@ export default async function EventsPage() {
           </div>
         </div>
       </div>
+            
+      {/* Featured Events Carousel */}
+      <EventsCarousel events={eventsWithData} />
 
       {/* Client component for events list */}
       <EventsClient initialEvents={eventsWithData} user={user} />

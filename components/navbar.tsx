@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { LanguageSwitcher } from "@/components/language-switcher"
-import { UserSearch } from "@/components/user-search"
 import { useTranslations } from "next-intl"
 import { Link } from "@/lib/i18n/routing"
 import { useAuthStore } from "@/lib/store/auth-store"
@@ -115,7 +114,7 @@ export function Navbar() {
     return (
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <a href="/es/events" className="text-2xl font-bold text-primary">
+          <a href="/es" className="text-2xl font-bold text-primary">
             EduCred
           </a>
           <div className="flex gap-4 items-center">
@@ -131,7 +130,7 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <Link href="/events" className="text-2xl font-bold text-primary">
+        <Link href="/" className="text-2xl font-bold text-primary">
           EduCred
         </Link>
         <div className="flex gap-4 items-center">
@@ -140,7 +139,6 @@ export function Navbar() {
               <Link href="/events">
                 <Button variant="ghost">Events</Button>
               </Link>
-              <UserSearch />
               {profile?.role === "instructor" || profile?.role === "admin" ? (
                 <Link href="/instructor">
                   <Button variant="ghost">{t('instructor')}</Button>
@@ -211,7 +209,6 @@ export function Navbar() {
               <Link href="/events">
                 <Button variant="ghost">Events</Button>
               </Link>
-              <UserSearch />
               <Link href="/auth/login">
                 <Button variant="ghost">{t('login')}</Button>
               </Link>

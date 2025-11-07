@@ -72,7 +72,18 @@ export function EventsClient({ initialEvents, user }: EventsClientProps) {
   }, {} as Record<string, typeof initialEvents>)
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="mb-8">
+        <h2 className="text-4xl font-bold mb-2">Descubrelos</h2>
+        <div className="flex gap-4 mt-6">
+                <Button variant="ghost" className="hover:bg-accent">
+                  Próximos
+                </Button>
+                <Button variant="ghost" className="text-muted-foreground hover:bg-accent hover:text-foreground">
+                  Pasados
+                </Button>
+              </div>
+      </div>
       {initialEvents.length > 0 ? (
         <div className="space-y-8">
           {Object.entries(groupedEvents).map(([dateKey, dateEvents]) => {
