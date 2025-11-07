@@ -127,6 +127,14 @@ export default function CourseViewer({
       const response = await fetch(`/api/courses/${courseId}/progress`)
       if (!response.ok) throw new Error('Error al cargar progreso')
       
+      // Verificar que la respuesta sea JSON antes de parsear
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("Expected JSON but got:", text.substring(0, 200))
+        throw new Error('Error al cargar progreso')
+      }
+      
       const data = await response.json()
       setProgress(data.progress || [])
       setStats(data.stats || {
@@ -144,6 +152,21 @@ export default function CourseViewer({
     try {
       const response = await fetch(`/api/certificates/status?courseId=${courseId}`)
       if (!response.ok) {
+        // Verificar que la respuesta sea JSON antes de parsear
+        const contentType = response.headers.get("content-type")
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text()
+          console.error("Expected JSON but got:", text.substring(0, 200))
+          return
+        }
+        return
+      }
+
+      // Verificar que la respuesta sea JSON antes de parsear
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("Expected JSON but got:", text.substring(0, 200))
         return
       }
 
@@ -183,6 +206,14 @@ export default function CourseViewer({
       })
 
       if (!response.ok) throw new Error('Error al actualizar progreso')
+
+      // Verificar que la respuesta sea JSON antes de parsear
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("Expected JSON but got:", text.substring(0, 200))
+        throw new Error('Error al actualizar progreso')
+      }
 
       const data = await response.json()
       
@@ -264,8 +295,24 @@ export default function CourseViewer({
       })
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Error desconocido' }))
-        throw new Error(error.error || 'No se pudo generar el certificado')
+        // Verificar que la respuesta sea JSON antes de parsear
+        const contentType = response.headers.get("content-type")
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json()
+          throw new Error(error.error || 'No se pudo generar el certificado')
+        } else {
+          const text = await response.text()
+          console.error("Expected JSON but got:", text.substring(0, 200))
+          throw new Error('No se pudo generar el certificado')
+        }
+      }
+
+      // Verificar que la respuesta sea JSON antes de parsear
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("Expected JSON but got:", text.substring(0, 200))
+        throw new Error('No se pudo generar el certificado')
       }
 
       const data = await response.json()

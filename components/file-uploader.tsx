@@ -74,8 +74,24 @@ export function FileUploader({
       clearInterval(progressInterval)
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Error al subir el archivo')
+        // Verificar que la respuesta sea JSON antes de parsear
+        const contentType = response.headers.get("content-type")
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json()
+          throw new Error(error.error || 'Error al subir el archivo')
+        } else {
+          const text = await response.text()
+          console.error("Expected JSON but got:", text.substring(0, 200))
+          throw new Error('Error al subir el archivo')
+        }
+      }
+
+      // Verificar que la respuesta sea JSON antes de parsear
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("Expected JSON but got:", text.substring(0, 200))
+        throw new Error('Error al subir el archivo')
       }
 
       const data = await response.json()

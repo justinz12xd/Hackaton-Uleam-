@@ -180,9 +180,25 @@ export function AIChatbot() {
       console.log("API Response status:", response.status)
 
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error("API Error:", errorData)
-        throw new Error(errorData.error || t('apiError'))
+        // Verificar que la respuesta sea JSON antes de parsear
+        const contentType = response.headers.get("content-type")
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json()
+          console.error("API Error:", errorData)
+          throw new Error(errorData.error || t('apiError'))
+        } else {
+          const errorText = await response.text()
+          console.error("API Error (non-JSON):", errorText)
+          throw new Error(t('apiError'))
+        }
+      }
+
+      // Verificar que la respuesta sea JSON antes de parsear
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("Expected JSON but got:", text.substring(0, 200))
+        throw new Error(t('apiError'))
       }
 
       const data = await response.json()

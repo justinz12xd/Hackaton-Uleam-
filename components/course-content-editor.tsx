@@ -59,6 +59,13 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
     try {
       const response = await fetch(`/api/courses/${courseId}/content`)
       if (response.ok) {
+        // Verificar que la respuesta sea JSON antes de parsear
+        const contentType = response.headers.get("content-type")
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text()
+          console.error("Expected JSON but got:", text.substring(0, 200))
+          throw new Error(t('errorLoading'))
+        }
         const data = await response.json()
         setContent(data.content || { modules: [] })
         setIsPublished(Boolean(data.isPublished))
@@ -80,6 +87,14 @@ export default function CourseContentEditor({ courseId, courseTitle }: CourseCon
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
   })
+
+  // Verificar que la respuesta sea JSON antes de parsear
+  const contentType = response.headers.get("content-type")
+  if (!contentType || !contentType.includes("application/json")) {
+    const text = await response.text()
+    console.error("Expected JSON but got:", text.substring(0, 200))
+    throw new Error(t('errorSaving'))
+  }
 
   const result = await response.json()
 

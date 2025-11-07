@@ -1,6 +1,7 @@
 import createMiddleware from 'next-intl/middleware';
 import { updateSession } from "@/lib/supabase/middleware"
 import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 import { routing } from './lib/i18n/routing';
 
 // Create the i18n middleware
@@ -25,7 +26,14 @@ const protectedRoutes = [
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   
-  // Primero manejar i18n
+  // Excluir rutas de API del procesamiento de i18n
+  // Las rutas de API no deben tener locale en la URL
+  if (pathname.startsWith('/api/')) {
+    // Para rutas de API, retornar directamente sin procesar i18n
+    return NextResponse.next()
+  }
+  
+  // Primero manejar i18n para rutas no-API
   const response = intlMiddleware(request);
   
   // Extraer la ruta sin el locale (ej: /es/dashboard -> /dashboard)
